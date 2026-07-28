@@ -1,17 +1,64 @@
+<?php
+include 'config/koneksi.php';
+
+// 1. Query Statistik Utama (Dioptimasi jadi 1 Query biar efisien)
+$q_stats = mysqli_query($koneksi, "
+    SELECT 
+        COUNT(*) AS total_barang,
+        SUM(CASE WHEN kondisi = 'Baik' THEN 1 ELSE 0 END) AS kondisi_baik,
+        SUM(CASE WHEN kondisi = 'Rusak Ringan' THEN 1 ELSE 0 END) AS rusak_ringan,
+        SUM(CASE WHEN kondisi = 'Rusak Berat' THEN 1 ELSE 0 END) AS rusak_berat
+    FROM detail_inventaris
+");
+$d_stats = mysqli_fetch_assoc($q_stats);
+
+$total_barang = $d_stats['total_barang'] ?? 0;
+$kondisi_baik = $d_stats['kondisi_baik'] ?? 0;
+$rusak_ringan  = $d_stats['rusak_ringan'] ?? 0;
+$rusak_berat   = $d_stats['rusak_berat'] ?? 0;
+
+$persen_baik  = ($total_barang > 0) ? round(($kondisi_baik / $total_barang) * 100) : 0;
+
+// 2. Total Jenis Barang
+$q_jenis = mysqli_query($koneksi, "SELECT COUNT(*) AS total_jenis FROM inventaris");
+$d_jenis = mysqli_fetch_assoc($q_jenis);
+$total_jenis = $d_jenis['total_jenis'] ?? 0;
+
+// 3. Top Kategori Barang
+$q_top_kategori = mysqli_query($koneksi, "
+    SELECT k.nama_kategori, COUNT(d.id) AS total_unit
+    FROM detail_inventaris d
+    JOIN inventaris i ON d.inventaris_id = i.id
+    JOIN kategori k ON i.kategori_id = k.id
+    GROUP BY k.id
+    ORDER BY total_unit DESC
+    LIMIT 5
+");
+
+// 4. Query List Ruangan + Jumlah Barang Per Ruangan (Untuk Sidebar Dinamis)
+$q_ruangan = mysqli_query($koneksi, "
+    SELECT r.id, r.nama_ruangan, COUNT(d.id) AS total_barang
+    FROM ruangan r
+    LEFT JOIN inventaris i ON r.id = i.ruangan_id
+    LEFT JOIN detail_inventaris d ON i.id = d.inventaris_id
+    GROUP BY r.id
+    ORDER BY r.nama_ruangan ASC
+");
+?>
+
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SIVENPRAS - Dashboard</title>
-    <!-- Memanggil file CSS Anda -->
     <link rel="stylesheet" href="assets/css/style.css">
-    <!-- Memanggil Icon Library (Phosphor Icons) -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
+
 <body>
 
-    <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="sidebar-brand">
             <div class="brand-icon">
@@ -30,84 +77,78 @@
                     <i class="ph ph-squares-four"></i> Dashboard
                 </div>
             </a>
-            <a href="#" class="menu-item">
+            <a href="daftar-inventaris.php" class="menu-item">
                 <div class="menu-left">
                     <i class="ph ph-clipboard-text"></i> Daftar Inventaris
                 </div>
             </a>
-            <a href="#" class="menu-item">
+            <a href="tambah-barang.php" class="menu-item">
                 <div class="menu-left">
                     <i class="ph ph-plus"></i> Tambah Barang
                 </div>
             </a>
-            <a href="#" class="menu-item">
+            <a href="laporan.php" class="menu-item">
                 <div class="menu-left">
                     <i class="ph ph-chart-bar"></i> Laporan
                 </div>
             </a>
 
-            <div class="menu-label" style="margin-top: 30px;">Ruangan <i class="ph ph-caret-up" style="float: right;"></i></div>
-            <!-- Nanti bagian ini bisa di-looping pakai PHP -->
-            <a href="#" class="menu-item">
-                <div class="menu-left"><i class="ph ph-house"></i> Aula</div>
-                <span class="badge">3</span>
-            </a>
-            <a href="#" class="menu-item">
-                <div class="menu-left"><i class="ph ph-house"></i> Gudang</div>
-                <span class="badge">25</span>
-            </a>
-            <a href="#" class="menu-item">
-                <div class="menu-left"><i class="ph ph-house"></i> Lab IPA</div>
-                <span class="badge">15</span>
-            </a>
-            <a href="#" class="menu-item">
-                <div class="menu-left"><i class="ph ph-house"></i> Lab Komputer</div>
-                <span class="badge">35</span>
-            </a>
-            <a href="#" class="menu-item">
-                <div class="menu-left"><i class="ph ph-house"></i> Lapangan</div>
-                <span class="badge">8</span>
-            </a>
+            <div class="menu-label" style="margin-top: 30px;">
+                Ruangan <i class="ph ph-caret-up" style="float: right;"></i>
+            </div>
+            
+            <?php 
+            if (mysqli_num_rows($q_ruangan) > 0) {
+                while ($r = mysqli_fetch_assoc($q_ruangan)) { 
+            ?>
+                <a href="ruangan.php?id=<?= $r['id']; ?>" class="menu-item">
+                    <div class="menu-left">
+                        <i class="ph ph-house"></i> <?= htmlspecialchars($r['nama_ruangan']); ?>
+                    </div>
+                    <span class="badge"><?= $r['total_barang']; ?></span>
+                </a>
+            <?php 
+                }
+            } else {
+                echo "<p style='padding: 0 15px; color: #aaa; font-size: 12px;'>Belum ada data ruangan</p>";
+            }
+            ?>
         </nav>
 
         <div class="sidebar-footer">
             <div class="menu-label" style="margin: 0 0 10px 0;">Sekolah</div>
-            <h4>SMP Negeri 1 Tasikmalaya</h4>
-            <p>Tahun Ajaran 2024/2025</p>
+            <h4>SMK TARUNA BANGSA</h4>
+            <p>Tahun Ajaran 2025/2026</p>
         </div>
     </aside>
 
-    <!-- MAIN CONTENT -->
     <main class="main-content">
-        <!-- Topbar -->
         <header class="topbar">
             <div class="breadcrumb">
                 SIVENPRAS-TB &rsaquo; <span>Dashboard</span>
             </div>
             <div class="topbar-actions">
-                <button class="btn-primary">
+                <a href="tambah-barang.php" class="btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
                     <i class="ph-bold ph-plus"></i> Tambah Barang
-                </button>
+                </a>
                 <div class="avatar">AD</div>
             </div>
         </header>
 
-        <!-- Dashboard Konten -->
         <div class="dashboard-container">
             <div class="page-header">
                 <h1>Dashboard Inventaris</h1>
                 <p>Ringkasan data sarana dan prasarana sekolah — diperbarui hari ini</p>
             </div>
 
-            <!-- Kartu Statistik -->
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-header">
                         <h3>Total Barang</h3>
                         <div class="icon-wrapper icon-teal"><i class="ph-bold ph-cube"></i></div>
                     </div>
-                    <div class="stat-value teal">548</div>
-                    <div class="stat-desc">12 jenis barang</div>
+                    <div class="stat-value teal"><?= number_format($total_barang); ?></div>
+                    <div class="stat-desc"><?= $total_jenis; ?> jenis barang</div>
                 </div>
 
                 <div class="stat-card">
@@ -115,8 +156,8 @@
                         <h3>Kondisi Baik</h3>
                         <div class="icon-wrapper icon-green"><i class="ph-bold ph-check-circle"></i></div>
                     </div>
-                    <div class="stat-value green">541</div>
-                    <div class="stat-desc">99% dari total</div>
+                    <div class="stat-value green"><?= number_format($kondisi_baik); ?></div>
+                    <div class="stat-desc"><?= $persen_baik; ?>% dari total</div>
                 </div>
 
                 <div class="stat-card">
@@ -124,7 +165,7 @@
                         <h3>Rusak Ringan</h3>
                         <div class="icon-wrapper icon-yellow"><i class="ph-bold ph-warning"></i></div>
                     </div>
-                    <div class="stat-value yellow">5</div>
+                    <div class="stat-value yellow"><?= number_format($rusak_ringan); ?></div>
                     <div class="stat-desc">Perlu perhatian</div>
                 </div>
 
@@ -133,60 +174,38 @@
                         <h3>Rusak Berat</h3>
                         <div class="icon-wrapper icon-red"><i class="ph-bold ph-x-circle"></i></div>
                     </div>
-                    <div class="stat-value red">2</div>
+                    <div class="stat-value red"><?= number_format($rusak_berat); ?></div>
                     <div class="stat-desc">Perlu penggantian</div>
                 </div>
             </div>
 
-            <!-- Widget Bawah -->
             <div class="dashboard-widgets">
-                
-                <!-- Grafik Top Kategori -->
+
                 <div class="widget-card">
                     <h3>Top Kategori Barang</h3>
-                    
-                    <div class="progress-item">
-                        <div class="progress-info">
-                            <span>Meja & Kursi</span>
-                            <span>242</span>
-                        </div>
-                        <div class="progress-bg"><div class="progress-fill" style="width: 85%;"></div></div>
-                    </div>
 
-                    <div class="progress-item">
-                        <div class="progress-info">
-                            <span>Perpustakaan</span>
-                            <span>208</span>
-                        </div>
-                        <div class="progress-bg"><div class="progress-fill" style="width: 75%;"></div></div>
-                    </div>
-
-                    <div class="progress-item">
-                        <div class="progress-info">
-                            <span>Elektronik</span>
-                            <span>50</span>
-                        </div>
-                        <div class="progress-bg"><div class="progress-fill" style="width: 30%;"></div></div>
-                    </div>
-                    
-                    <div class="progress-item">
-                        <div class="progress-info">
-                            <span>Kebersihan & Sanitasi</span>
-                            <span>25</span>
-                        </div>
-                        <div class="progress-bg"><div class="progress-fill" style="width: 15%;"></div></div>
-                    </div>
-
-                    <div class="progress-item">
-                        <div class="progress-info">
-                            <span>Laboratorium</span>
-                            <span>15</span>
-                        </div>
-                        <div class="progress-bg"><div class="progress-fill" style="width: 10%;"></div></div>
-                    </div>
+                    <?php
+                    if (mysqli_num_rows($q_top_kategori) > 0) {
+                        while ($row = mysqli_fetch_assoc($q_top_kategori)) {
+                            $persen_bar = ($total_barang > 0) ? round(($row['total_unit'] / $total_barang) * 100) : 0;
+                            ?>
+                            <div class="progress-item">
+                                <div class="progress-info">
+                                    <span><?= htmlspecialchars($row['nama_kategori']); ?></span>
+                                    <span><?= $row['total_unit']; ?></span>
+                                </div>
+                                <div class="progress-bg">
+                                    <div class="progress-fill" style="width: <?= $persen_bar; ?>%;"></div>
+                                </div>
+                            </div>
+                        <?php
+                        }
+                    } else {
+                        echo "<p style='color:#888; font-size:14px;'>Belum ada data barang.</p>";
+                    }
+                    ?>
                 </div>
 
-                <!-- Distribusi Kondisi -->
                 <div class="widget-card">
                     <h3>Distribusi Kondisi</h3>
                     <ul class="kondisi-list">
@@ -194,19 +213,19 @@
                             <div class="kondisi-left">
                                 <div class="dot green"></div> Baik
                             </div>
-                            <div class="kondisi-value">541</div>
+                            <div class="kondisi-value"><?= number_format($kondisi_baik); ?></div>
                         </li>
                         <li class="kondisi-item">
                             <div class="kondisi-left">
                                 <div class="dot yellow"></div> Rusak Ringan
                             </div>
-                            <div class="kondisi-value">5</div>
+                            <div class="kondisi-value"><?= number_format($rusak_ringan); ?></div>
                         </li>
                         <li class="kondisi-item">
                             <div class="kondisi-left">
                                 <div class="dot red"></div> Rusak Berat
                             </div>
-                            <div class="kondisi-value">2</div>
+                            <div class="kondisi-value"><?= number_format($rusak_berat); ?></div>
                         </li>
                     </ul>
                 </div>
@@ -216,4 +235,5 @@
     </main>
 
 </body>
+
 </html>
