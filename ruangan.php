@@ -1,16 +1,15 @@
 <?php
 include 'config/koneksi.php';
 
-// 1. Ambil ID Ruangan dari URL (contoh: ruangan.php?id=3)
+// 1. Ambil ID Ruangan dari URL
 $id_ruangan = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// Jika tidak ada ID di URL, redirect ke index/dashboard
 if ($id_ruangan == 0) {
     header("Location: index.php");
     exit;
 }
 
-// Update kondisi inventaris bila ada form submit
+// Handler Update Kondisi via AJAX / POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_kondisi'], $_POST['id_inventaris'])) {
     $id_inventaris = (int)$_POST['id_inventaris'];
     $normalized = strtolower(trim(preg_replace('/\s+/', ' ', $_POST['kondisi'])));
@@ -24,14 +23,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_kondisi'], $_P
 
     if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
         header('Content-Type: application/json');
+        
+        $q_b = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi = 'baik'");
+        $d_b = mysqli_fetch_assoc($q_b);
+        $stat_baik = $d_b['total'] ?? 0;
+
+        $q_p = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi != 'baik'");
+        $d_p = mysqli_fetch_assoc($q_p);
+        $stat_perhatian = $d_p['total'] ?? 0;
+
         echo json_encode([
-            'success' => $success,
-            'kondisi' => $kondisi,
-            'message' => $success ? 'Kondisi berhasil disimpan.' : 'Gagal menyimpan kondisi.'
+            'success'        => $success,
+            'kondisi'        => $kondisi,
+            'total_baik'     => $stat_baik,
+            'total_perhatian'=> $stat_perhatian,
+            'message'        => $success ? 'Kondisi berhasil disimpan.' : 'Gagal menyimpan kondisi.'
         ]);
         exit;
     }
 
+    header("Location: ruangan.php?id=$id_ruangan");
+    exit;
+}
+
+// Handler Update Keterangan via AJAX / POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_keterangan'], $_POST['id_inventaris'])) {
+    $id_inventaris = (int)$_POST['id_inventaris'];
+    $keterangan = mysqli_real_escape_string($koneksi, trim($_POST['keterangan']));
+
+    $success = (bool) mysqli_query($koneksi, "UPDATE inventaris SET keterangan = '$keterangan' WHERE id_inventaris = '$id_inventaris' AND ruangan_id = '$id_ruangan'");
+
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => $success,
+            'message' => $success ? 'Keterangan berhasil diperbarui.' : 'Gagal memperbarui keterangan.'
+        ]);
+        exit;
+    }
+
+    header("Location: ruangan.php?id=$id_ruangan");
+    exit;
+}
+
+// Handler Hapus Massal (Multiple Delete via Checkbox)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['hapus_massal'], $_POST['ids_inventaris'])) {
+    $ids = array_map('intval', $_POST['ids_inventaris']);
+    
+    if (!empty($ids)) {
+        $id_list = implode(',', $ids);
+        mysqli_query($koneksi, "DELETE FROM inventaris WHERE id_inventaris IN ($id_list) AND ruangan_id = '$id_ruangan'");
+    }
+    
     header("Location: ruangan.php?id=$id_ruangan");
     exit;
 }
@@ -45,7 +88,7 @@ if (!$d_ruangan) {
     exit;
 }
 
-// 3. Query untuk Sidebar Ruangan (Hitung total unit fisik per ruangan)
+// 3. Query untuk Sidebar Ruangan
 $q_ruangan_sidebar = mysqli_query($koneksi, "
     SELECT r.id_ruangan, r.nama_ruangan, COUNT(i.id_inventaris) AS total_barang 
     FROM ruangan r 
@@ -53,44 +96,38 @@ $q_ruangan_sidebar = mysqli_query($koneksi, "
     GROUP BY r.id_ruangan, r.nama_ruangan
 ");
 
-// 4. Query Menghitung Statistik Card Atas untuk Ruangan Ini
-// - Jenis Barang (Jumlah Jenis Master Barang berada di ruangan ini)
+// 4. Query Menghitung Statistik Card Atas
 $q_stat_jenis = mysqli_query($koneksi, "SELECT COUNT(DISTINCT barang_id) AS total_jenis FROM inventaris WHERE ruangan_id = '$id_ruangan'");
 $d_stat_jenis = mysqli_fetch_assoc($q_stat_jenis);
 $total_jenis = $d_stat_jenis['total_jenis'] ?? 0;
 
-// - Total Satuan (Jumlah Unit Fisik di inventaris)
-$q_stat_satuan = mysqli_query($koneksi, "
-    SELECT COUNT(id_inventaris) AS total_satuan 
-    FROM inventaris 
-    WHERE ruangan_id = '$id_ruangan'
-");
+$q_stat_satuan = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total_satuan FROM inventaris WHERE ruangan_id = '$id_ruangan'");
 $d_stat_satuan = mysqli_fetch_assoc($q_stat_satuan);
 $total_satuan = $d_stat_satuan['total_satuan'] ?? 0;
 
-// - Kondisi Baik
-$q_stat_baik = mysqli_query($koneksi, "
-    SELECT COUNT(id_inventaris) AS total_baik 
-    FROM inventaris 
-    WHERE ruangan_id = '$id_ruangan' AND kondisi = 'baik'
-");
+$q_stat_baik = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total_baik FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi = 'baik'");
 $d_stat_baik = mysqli_fetch_assoc($q_stat_baik);
 $total_baik = $d_stat_baik['total_baik'] ?? 0;
 
-// - Perlu Perhatian (Kondisi rusak atau hilang)
-$q_stat_perhatian = mysqli_query($koneksi, "
-    SELECT COUNT(id_inventaris) AS total_perhatian 
-    FROM inventaris 
-    WHERE ruangan_id = '$id_ruangan' AND kondisi != 'baik'
-");
+$q_stat_perhatian = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total_perhatian FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi != 'baik'");
 $d_stat_perhatian = mysqli_fetch_assoc($q_stat_perhatian);
 $total_perhatian = $d_stat_perhatian['total_perhatian'] ?? 0;
 
+// 5. Data Pilihan Nama Barang untuk Dropdown Filter
+$q_filter_barang = mysqli_query($koneksi, "
+    SELECT DISTINCT b.id_barang, b.nama_barang 
+    FROM inventaris i 
+    JOIN barang b ON i.barang_id = b.id_barang 
+    WHERE i.ruangan_id = '$id_ruangan' 
+    ORDER BY b.nama_barang ASC
+");
 
-// 5. Query Menampilkan Daftar Unit Inventaris di Ruangan
-// Menerima pencarian dari form jika ada
-$keyword = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
+// 6. Tangkap Param Filter & Search dari URL
+$keyword       = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
+$filter_barang  = isset($_GET['filter_barang']) ? (int)$_GET['filter_barang'] : 0;
+$filter_kondisi = isset($_GET['filter_kondisi']) ? mysqli_real_escape_string($koneksi, $_GET['filter_kondisi']) : '';
 
+// 7. Query Menampilkan Daftar Unit Inventaris di Ruangan
 $sql_list = "
     SELECT 
         i.id_inventaris,
@@ -109,6 +146,12 @@ $sql_list = "
 
 if (!empty($keyword)) {
     $sql_list .= " AND (i.barcode LIKE '%$keyword%' OR b.nama_barang LIKE '%$keyword%' OR k.nama_kategori LIKE '%$keyword%')";
+}
+if ($filter_barang > 0) {
+    $sql_list .= " AND b.id_barang = '$filter_barang'";
+}
+if (!empty($filter_kondisi)) {
+    $sql_list .= " AND i.kondisi = '$filter_kondisi'";
 }
 
 $sql_list .= " ORDER BY i.barcode ASC";
@@ -151,28 +194,15 @@ $q_list = mysqli_query($koneksi, $sql_list);
         .stat-card.good h2 { color: #16a34a; }
         .stat-card.warning h2 { color: #dc2626; }
         
-        .badge-kondisi {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            display: inline-block;
-        }
-        .badge-baik { background: #dcfce7; color: #15803d; }
-        .badge-cukup-baik { background: #fde047; color: #92400e; }
-        .badge-rusak { background: #fb923c; color: #7c2d12; }
-        .badge-rusak-parah { background: #f87171; color: #7f1d1d; }
-        .badge-hilang { background: #111827; color: #ffffff; }
-        
         .select-kondisi {
             border: 1px solid #cbd5e1;
             border-radius: 8px;
-            padding: 10px 12px;
+            padding: 8px 10px;
             background: #fff;
             color: #0f172a;
             font-size: 13px;
-            min-width: 160px;
-            max-width: 220px;
+            width: 100%;
+            min-width: 130px;
             cursor: pointer;
         }
         .select-baik { background: #dcfce7; color: #15803d; }
@@ -180,35 +210,103 @@ $q_list = mysqli_query($koneksi, $sql_list);
         .select-rusak { background: #fb923c; color: #7c2d12; }
         .select-rusak-parah { background: #f87171; color: #7f1d1d; }
         .select-hilang { background: #111827; color: #ffffff; }
+
         .table-container {
             background: #fff;
             border-radius: 12px;
             border: 1px solid #e2e8f0;
             padding: 20px;
         }
-        .table-header {
+        
+        .filter-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 20px;
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .filter-item label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+        .filter-select, .search-box-input {
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 8px 12px;
+            background: #fff;
+            font-size: 13px;
+            color: #0f172a;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .btn-reset-filter {
+            background: #f1f5f9;
+            color: #475569;
+            padding: 8px 14px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: auto;
+            border: 1px solid #cbd5e1;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-reset-filter:hover { background: #e2e8f0; }
+
+        /* STYLE DROPDOWN SIDEBAR RUANGAN */
+        .sidebar-dropdown-btn {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
+            cursor: pointer;
+            user-select: none;
+            margin-top: 24px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: background 0.2s;
         }
-        .search-box {
+        .sidebar-dropdown-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .sidebar-dropdown-container {
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            margin-top: 6px;
+            padding-left: 8px;
+            overflow: hidden;
+        }
+        .sidebar-dropdown-container.open {
             display: flex;
-            align-items: center;
-            background: #f8fafc;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            padding: 8px 14px;
-            width: 300px;
         }
-        .search-box input {
-            border: none;
-            background: transparent;
-            outline: none;
-            margin-left: 8px;
-            width: 100%;
-            font-size: 14px;
+        .caret-icon {
+            transition: transform 0.3s ease;
         }
+        .caret-icon.rotate {
+            transform: rotate(180deg);
+        }
+
+        /* Checkbox */
+        input[type="checkbox"] {
+            transform: scale(1.3);
+            cursor: pointer;
+            accent-color: #0d9488;
+            margin: 4px;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -222,20 +320,12 @@ $q_list = mysqli_query($koneksi, $sql_list);
             border-bottom: 1px solid #e2e8f0;
         }
         td {
-            padding: 14px 12px;
+            padding: 12px;
             border-bottom: 1px solid #f1f5f9;
             font-size: 14px;
             color: #334155;
+            vertical-align: middle;
         }
-        .btn-action {
-            padding: 6px 12px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .btn-edit { background: #f1f5f9; color: #334155; margin-right: 4px; }
-        .btn-hapus { background: #fef2f2; color: #dc2626; }
     </style>
 </head>
 
@@ -267,18 +357,21 @@ $q_list = mysqli_query($koneksi, $sql_list);
                 <div class="menu-left"><i class="ph ph-chart-bar"></i> Laporan</div>
             </a>
 
-            <div class="menu-label" style="margin-top: 30px;">
-                Ruangan <i class="ph ph-caret-up" style="float: right;"></i>
+            <div class="menu-label sidebar-dropdown-btn" onclick="toggleRuanganDropdown()">
+                <span>Ruangan</span>
+                <i class="ph ph-caret-down caret-icon" id="ruanganCaret"></i>
             </div>
 
-            <?php while ($r = mysqli_fetch_assoc($q_ruangan_sidebar)) { 
-                $activeClass = ($r['id_ruangan'] == $id_ruangan) ? 'active' : '';
-            ?>
-                <a href="ruangan.php?id=<?= $r['id_ruangan']; ?>" class="menu-item <?= $activeClass; ?>">
-                    <div class="menu-left"><i class="ph ph-house"></i> <?= htmlspecialchars($r['nama_ruangan']); ?></div>
-                    <span class="badge"><?= $r['total_barang']; ?></span>
-                </a>
-            <?php } ?>
+            <div class="sidebar-dropdown-container open" id="ruanganDropdown">
+                <?php while ($r = mysqli_fetch_assoc($q_ruangan_sidebar)) { 
+                    $activeClass = ($r['id_ruangan'] == $id_ruangan) ? 'active' : '';
+                ?>
+                    <a href="ruangan.php?id=<?= $r['id_ruangan']; ?>" class="menu-item <?= $activeClass; ?>">
+                        <div class="menu-left"><i class="ph ph-house"></i> <?= htmlspecialchars($r['nama_ruangan']); ?></div>
+                        <span class="badge"><?= $r['total_barang']; ?></span>
+                    </a>
+                <?php } ?>
+            </div>
         </nav>
 
         <div class="sidebar-footer">
@@ -292,11 +385,6 @@ $q_list = mysqli_query($koneksi, $sql_list);
         <header class="topbar" style="display: flex; justify-content: space-between; align-items: center;">
             <div class="breadcrumb">
                 SIVENPRAS-TB &rsaquo; Ruangan &rsaquo; <span><?= htmlspecialchars($d_ruangan['nama_ruangan']); ?></span>
-            </div>
-            <div>
-                <a href="tambah-barang.php" class="btn-primary" style="text-decoration: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 14px; background: #0d9488; color: white;">
-                    + Tambah Barang
-                </a>
             </div>
         </header>
 
@@ -312,144 +400,266 @@ $q_list = mysqli_query($koneksi, $sql_list);
             <div class="card-stats-grid">
                 <div class="stat-card">
                     <p>Jenis Barang</p>
-                    <h2><?= $total_jenis; ?></h2>
+                    <h2 id="stat-jenis"><?= $total_jenis; ?></h2>
                 </div>
                 <div class="stat-card">
                     <p>Total Satuan</p>
-                    <h2><?= $total_satuan; ?></h2>
+                    <h2 id="stat-satuan"><?= $total_satuan; ?></h2>
                 </div>
                 <div class="stat-card good">
                     <p>Kondisi Baik</p>
-                    <h2><?= $total_baik; ?></h2>
+                    <h2 id="stat-baik"><?= $total_baik; ?></h2>
                 </div>
                 <div class="stat-card warning">
                     <p>Perlu Perhatian</p>
-                    <h2><?= $total_perhatian; ?></h2>
+                    <h2 id="stat-perhatian"><?= $total_perhatian; ?></h2>
                 </div>
             </div>
 
             <div class="table-container">
-                <div class="table-header">
-                    <form method="GET" action="ruangan.php" class="search-box">
-                        <input type="hidden" name="id" value="<?= $id_ruangan; ?>">
-                        <i class="ph ph-magnifying-glass" style="color: #94a3b8;"></i>
-                        <input type="text" name="search" placeholder="Cari barang di ruangan ini..." value="<?= htmlspecialchars($keyword); ?>">
-                    </form>
-                    <span style="font-size: 13px; color: #64748b;"><?= mysqli_num_rows($q_list); ?> dari <?= $total_jenis; ?> barang</span>
-                </div>
+                
+                <form method="GET" action="ruangan.php" class="filter-container" id="filterForm">
+                    <input type="hidden" name="id" value="<?= $id_ruangan; ?>">
 
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 50px;">NO</th>
-                            <th style="width: 160px;">BARCODE</th>
-                            <th>NAMA BARANG</th>
-                            <th>KATEGORI</th>
-                            <th>KONDISI</th>
-                            <th>KETERANGAN</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php 
-                        if (mysqli_num_rows($q_list) > 0) {
-                            $no = 1;
-                            while ($row = mysqli_fetch_assoc($q_list)) { 
-                                $kondisiRaw = $row['kondisi'] ?? 'baik';
-                                $kondisiLower = strtolower(trim(preg_replace('/\s+/', ' ', $kondisiRaw)));
-                                $badgeClass = 'badge-baik';
-                                if ($kondisiLower === 'cukup baik') {
-                                    $badgeClass = 'badge-cukup-baik';
-                                } elseif ($kondisiLower === 'rusak') {
-                                    $badgeClass = 'badge-rusak';
-                                } elseif ($kondisiLower === 'rusak parah') {
-                                    $badgeClass = 'badge-rusak-parah';
-                                } elseif ($kondisiLower === 'hilang') {
-                                    $badgeClass = 'badge-hilang';
-                                }
-                                $displayKondisi = ucwords($kondisiLower);
-                        ?>
+                    <div class="filter-item" style="flex: 1; min-width: 180px;">
+                        <label>Cari Kata Kunci</label>
+                        <input type="text" name="search" id="searchInput" class="search-box-input" placeholder="Kode barang, Barang..." value="<?= htmlspecialchars($keyword); ?>" oninput="autoSearch(this)">
+                    </div>
+
+                    <div class="filter-item">
+                        <label>Nama Barang</label>
+                        <select name="filter_barang" class="filter-select" onchange="this.form.submit()">
+                            <option value=""> Semua Barang </option>
+                            <?php while ($fb = mysqli_fetch_assoc($q_filter_barang)) { ?>
+                                <option value="<?= $fb['id_barang']; ?>" <?= $filter_barang == $fb['id_barang'] ? 'selected' : ''; ?>>
+                                    <?= htmlspecialchars($fb['nama_barang']); ?>
+                                </option>
+                            <?php } ?>
+                        </select>
+                    </div>
+
+                    <div class="filter-item">
+                        <label>Kondisi Barang</label>
+                        <select name="filter_kondisi" class="filter-select" onchange="this.form.submit()">
+                            <option value=""> Semua Kondisi </option>
+                            <option value="baik" <?= $filter_kondisi === 'baik' ? 'selected' : ''; ?>>Baik</option>
+                            <option value="cukup baik" <?= $filter_kondisi === 'cukup baik' ? 'selected' : ''; ?>>Cukup Baik</option>
+                            <option value="rusak" <?= $filter_kondisi === 'rusak' ? 'selected' : ''; ?>>Rusak</option>
+                            <option value="rusak parah" <?= $filter_kondisi === 'rusak parah' ? 'selected' : ''; ?>>Rusak Parah</option>
+                            <option value="hilang" <?= $filter_kondisi === 'hilang' ? 'selected' : ''; ?>>Hilang</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" style="display:none;"></button>
+
+                    <?php if (!empty($keyword) || $filter_barang > 0 || !empty($filter_kondisi)) { ?>
+                        <a href="ruangan.php?id=<?= $id_ruangan; ?>" class="btn-reset-filter">
+                            <i class="ph ph-x-circle"></i> Reset Filter
+                        </a>
+                    <?php } ?>
+                </form>
+
+                <form method="POST" action="ruangan.php?id=<?= $id_ruangan; ?>" id="formHapusMassal">
+                    <input type="hidden" name="hapus_massal" value="1">
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <span style="font-size: 13px; color: #64748b;">
+                            Menampilkan <strong><?= mysqli_num_rows($q_list); ?></strong> barang
+                        </span>
+
+                        <button type="submit" 
+                                id="btnHapusMassal" 
+                                onclick="return confirm('Apakah Anda yakin ingin menghapus barang yang dicentang?')" 
+                                style="display: none; background: #dc2626; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; align-items: center; gap: 6px;">
+                            <i class="ph ph-trash"></i> Hapus yang Dipilih (<span id="jumlahTerpilih">0</span>)
+                        </button>
+                    </div>
+
+                    <table>
+                        <thead>
                             <tr>
-                                <td><?= $no++; ?></td>
-                                <td style="font-weight: 700; color: #0f172a;"><?= htmlspecialchars($row['barcode']); ?></td>
-                                <td>
-                                    <strong><?= htmlspecialchars($row['nama_barang']); ?></strong>
-                                    <div style="font-size: 12px; color: #94a3b8;"><?= htmlspecialchars($row['deskripsi']); ?></div>
-                                </td>
-                                <td><?= htmlspecialchars($row['nama_kategori'] ?? '-'); ?></td>
-                                <td>
-                                    <form method="POST" action="ruangan.php?id=<?= $id_ruangan; ?>">
-                                        <input type="hidden" name="id_inventaris" value="<?= $row['id_inventaris']; ?>">
-                                        <select name="kondisi" class="select-kondisi select-<?= str_replace(' ', '-', $kondisiLower); ?>" onchange="saveCondition(this)">
+                                <th style="width: 40px; text-align: center;">
+                                    <input type="checkbox" id="checkAll" onchange="toggleSelectAll(this)">
+                                </th>
+                                <th style="width: 150px;">KODE BARANG</th>
+                                <th>NAMA BARANG</th>
+                                <th>KATEGORI</th>
+                                <th style="width: 200px;">KETERANGAN</th>
+                                <th style="width: 170px;">KONDISI</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php 
+                            if (mysqli_num_rows($q_list) > 0) {
+                                $no = 1;
+                                while ($row = mysqli_fetch_assoc($q_list)) { 
+                                    $kondisiRaw = $row['kondisi'] ?? 'baik';
+                                    $kondisiLower = strtolower(trim(preg_replace('/\s+/', ' ', $kondisiRaw)));
+                            ?>
+                                <tr>
+                                    <td style="text-align: center;">
+                                        <input type="checkbox" name="ids_inventaris[]" value="<?= $row['id_inventaris']; ?>" class="item-checkbox" onchange="updateBatchDeleteButton()">
+                                    </td>
+                                    <td style="font-weight: 700; color: #0f172a;"><?= htmlspecialchars($row['barcode']); ?></td>
+                                    <td>
+                                        <strong><?= htmlspecialchars($row['nama_barang']); ?></strong>
+                                        <div style="font-size: 12px; color: #94a3b8;"><?= htmlspecialchars($row['deskripsi']); ?></div>
+                                    </td>
+                                    <td><?= htmlspecialchars($row['nama_kategori'] ?? '-'); ?></td>
+                                    <td>
+                                        <input type="text" 
+                                               class="search-box-input" 
+                                               style="width: 100%;" 
+                                               value="<?= htmlspecialchars($row['keterangan_inventaris'] ?? ''); ?>" 
+                                               placeholder="Tambah keterangan..." 
+                                               onchange="saveKeteranganInline(<?= $row['id_inventaris']; ?>, this)">
+                                    </td>
+                                    <td>
+                                        <select class="select-kondisi select-<?= str_replace(' ', '-', $kondisiLower); ?>" onchange="saveConditionInline(<?= $row['id_inventaris']; ?>, this)">
                                             <option value="baik" <?= $kondisiLower === 'baik' ? 'selected' : ''; ?>>Baik</option>
                                             <option value="cukup baik" <?= $kondisiLower === 'cukup baik' ? 'selected' : ''; ?>>Cukup Baik</option>
                                             <option value="rusak" <?= $kondisiLower === 'rusak' ? 'selected' : ''; ?>>Rusak</option>
                                             <option value="rusak parah" <?= $kondisiLower === 'rusak parah' ? 'selected' : ''; ?>>Rusak Parah</option>
                                             <option value="hilang" <?= $kondisiLower === 'hilang' ? 'selected' : ''; ?>>Hilang</option>
                                         </select>
-                                        <input type="hidden" name="update_kondisi" value="1">
-                                    </form>
-                                </td>
-                                <td><?= htmlspecialchars($row['keterangan_inventaris'] ?? '-'); ?></td>
-                            </tr>
-                        <?php 
-                            }
-                        } else { 
-                        ?>
-                            <tr>
-                                <td colspan="6" style="text-align: center; padding: 30px; color: #94a3b8;">
-                                    Belum ada data barang di ruangan ini.
-                                </td>
-                            </tr>
-                        <?php } ?>
-                    </tbody>
-                </table>
+                                    </td>
+                                </tr>
+                            <?php 
+                                }
+                            } else { 
+                            ?>
+                                <tr>
+                                    <td colspan="7" style="text-align: center; padding: 30px; color: #94a3b8;">
+                                        Data barang tidak ditemukan sesuai filter yang dipilih.
+                                    </td>
+                                </tr>
+                            <?php } ?>
+                        </tbody>
+                    </table>
+                </form>
             </div>
 
         </div>
     </main>
 
     <script>
-        function toggleEditMode(formId, hideOnly = false) {
-            var form = document.getElementById(formId);
-            if (!form) return;
-
-            if (hideOnly) {
-                form.classList.remove('active');
-                return;
+        // 1. Toggle Dropdown Sidebar Ruangan
+        function toggleRuanganDropdown() {
+            var dropdown = document.getElementById('ruanganDropdown');
+            var caret = document.getElementById('ruanganCaret');
+            
+            if (dropdown.classList.contains('open')) {
+                dropdown.classList.remove('open');
+                caret.classList.add('rotate');
+            } else {
+                dropdown.classList.add('open');
+                caret.classList.remove('rotate');
             }
-
-            var isActive = form.classList.contains('active');
-            form.classList.toggle('active', !isActive);
         }
 
-        function saveCondition(select) {
-            var form = select.form;
-            if (!form) return;
+        // 2. Auto Search dengan Debounce
+        var searchTimer;
+        function autoSearch(input) {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(function() {
+                input.form.submit();
+            }, 500);
+        }
 
-            var formData = new FormData(form);
-            fetch(form.action, {
+        // Kursor tetap fokus di input search setelah reload
+        document.addEventListener("DOMContentLoaded", function() {
+            var searchInput = document.getElementById('searchInput');
+            if (searchInput && searchInput.value !== '') {
+                searchInput.focus();
+                var val = searchInput.value;
+                searchInput.value = '';
+                searchInput.value = val;
+            }
+        });
+
+        // 3. Save Kondisi Inline via AJAX
+        function saveConditionInline(id_inventaris, selectElement) {
+            var formData = new FormData();
+            formData.append('id_inventaris', id_inventaris);
+            formData.append('kondisi', selectElement.value);
+            formData.append('update_kondisi', '1');
+
+            fetch('ruangan.php?id=<?= $id_ruangan; ?>', {
                 method: 'POST',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 body: formData
             })
-            .then(function(response) {
-                if (!response.ok) {
-                    throw new Error('Gagal menyimpan kondisi.');
-                }
-                return response.json();
-            })
+            .then(function(res) { return res.json(); })
             .then(function(data) {
-                if (!data.success) {
-                    throw new Error(data.message || 'Gagal menyimpan kondisi.');
+                if (data.success) {
+                    var value = selectElement.value.toLowerCase().replace(/\s+/g, '-');
+                    selectElement.className = 'select-kondisi select-' + value;
+
+                    if (data.total_baik !== undefined) {
+                        document.getElementById('stat-baik').textContent = data.total_baik;
+                    }
+                    if (data.total_perhatian !== undefined) {
+                        document.getElementById('stat-perhatian').textContent = data.total_perhatian;
+                    }
+                } else {
+                    alert(data.message || 'Gagal menyimpan kondisi.');
                 }
-                var value = select.value.toLowerCase().replace(/\s+/g, '-');
-                select.className = 'select-kondisi select-' + value;
             })
-            .catch(function(error) {
-                alert(error.message);
+            .catch(function(err) { alert(err.message); });
+        }
+
+        // 4. Save Keterangan Inline via AJAX
+        function saveKeteranganInline(id_inventaris, inputElement) {
+            var formData = new FormData();
+            formData.append('id_inventaris', id_inventaris);
+            formData.append('keterangan', inputElement.value);
+            formData.append('update_keterangan', '1');
+
+            fetch('ruangan.php?id=<?= $id_ruangan; ?>', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    inputElement.style.borderColor = '#16a34a';
+                    setTimeout(function() {
+                        inputElement.style.borderColor = '#cbd5e1';
+                    }, 1200);
+                } else {
+                    alert(data.message || 'Gagal menyimpan keterangan.');
+                }
+            })
+            .catch(function(err) { alert(err.message); });
+        }
+
+        // 5. Checkbox Select All & Batch Delete Toggle
+        function toggleSelectAll(mainCheckbox) {
+            var checkboxes = document.querySelectorAll('.item-checkbox');
+            checkboxes.forEach(function(cb) {
+                cb.checked = mainCheckbox.checked;
             });
+            updateBatchDeleteButton();
+        }
+
+        function updateBatchDeleteButton() {
+            var checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
+            var btnHapus = document.getElementById('btnHapusMassal');
+            var jumlahSpan = document.getElementById('jumlahTerpilih');
+            var checkAll = document.getElementById('checkAll');
+            var totalBoxes = document.querySelectorAll('.item-checkbox');
+
+            if (checkedBoxes.length > 0) {
+                btnHapus.style.display = 'inline-flex';
+                jumlahSpan.textContent = checkedBoxes.length;
+            } else {
+                btnHapus.style.display = 'none';
+            }
+
+            if (totalBoxes.length > 0) {
+                checkAll.checked = (checkedBoxes.length === totalBoxes.length);
+            }
         }
     </script>
 </body>
