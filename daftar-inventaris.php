@@ -6,14 +6,13 @@ $search   = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['
 $kategori = isset($_GET['kategori']) ? mysqli_real_escape_string($koneksi, $_GET['kategori']) : '';
 $kondisi  = isset($_GET['kondisi']) ? mysqli_real_escape_string($koneksi, $_GET['kondisi']) : '';
 
-// Query Dasar: Menggabungkan tabel inventaris, kategori, ruangan, dan detail_inventaris
 $where_clauses = [];
 
 if (!empty($search)) {
     $where_clauses[] = "(i.nama_barang LIKE '%$search%' OR i.kode_barang LIKE '%$search%' OR r.nama_ruangan LIKE '%$search%')";
 }
 if (!empty($kategori)) {
-    $where_clauses[] = "i.kategori_id = '$kategori'";
+    $where_clauses[] = "i.id_kategori = '$kategori'";
 }
 if (!empty($kondisi)) {
     $where_clauses[] = "d.kondisi = '$kondisi'";
@@ -27,23 +26,22 @@ if (count($where_clauses) > 0) {
 // Query Utama Fetch Data Barang
 $query = "
     SELECT 
-        i.id AS inventaris_id,
+        i.id_inventaris,
         i.kode_barang,
         i.nama_barang,
         i.deskripsi,
         i.satuan,
         k.nama_kategori,
         r.nama_ruangan,
-        COUNT(d.id) AS jumlah_unit,
-        -- Mengambil status kondisi yang dominan
+        COUNT(d.id_detail) AS jumlah_unit,
         GROUP_CONCAT(DISTINCT d.kondisi SEPARATOR ', ') AS daftar_kondisi
     FROM inventaris i
-    LEFT JOIN kategori k ON i.kategori_id = k.id
-    LEFT JOIN ruangan r ON i.ruangan_id = r.id
-    LEFT JOIN detail_inventaris d ON i.id = d.inventaris_id
+    LEFT JOIN kategori k ON i.id_kategori = k.id_kategori
+    LEFT JOIN ruangan r ON i.id_ruangan = r.id_ruangan
+    LEFT JOIN detail_inventaris d ON i.id_inventaris = d.id_inventaris
     $where_sql
-    GROUP BY i.id
-    ORDER BY i.id DESC
+    GROUP BY i.id_inventaris
+    ORDER BY i.id_inventaris DESC
 ";
 $result_barang = mysqli_query($koneksi, $query);
 
@@ -52,11 +50,11 @@ $q_filter_kategori = mysqli_query($koneksi, "SELECT * FROM kategori ORDER BY nam
 
 // Query List Ruangan untuk Sidebar Dinamis
 $q_ruangan = mysqli_query($koneksi, "
-    SELECT r.id, r.nama_ruangan, COUNT(d.id) AS total_barang
+    SELECT r.id_ruangan, r.nama_ruangan, COUNT(d.id_detail) AS total_barang
     FROM ruangan r
-    LEFT JOIN inventaris i ON r.id = i.ruangan_id
-    LEFT JOIN detail_inventaris d ON i.id = d.inventaris_id
-    GROUP BY r.id
+    LEFT JOIN inventaris i ON r.id_ruangan = i.id_ruangan
+    LEFT JOIN detail_inventaris d ON i.id_inventaris = d.id_inventaris
+    GROUP BY r.id_ruangan, r.nama_ruangan
     ORDER BY r.nama_ruangan ASC
 ");
 ?>
@@ -92,7 +90,7 @@ $q_ruangan = mysqli_query($koneksi, "
                     <i class="ph ph-squares-four"></i> Dashboard
                 </div>
             </a>
-            <a href="inventaris.php" class="menu-item active">
+            <a href="daftar-inventaris.php" class="menu-item active">
                 <div class="menu-left">
                     <i class="ph ph-clipboard-text"></i> Daftar Inventaris
                 </div>
@@ -113,10 +111,10 @@ $q_ruangan = mysqli_query($koneksi, "
             </div>
             
             <?php 
-            if (mysqli_num_rows($q_ruangan) > 0) {
+            if ($q_ruangan && mysqli_num_rows($q_ruangan) > 0) {
                 while ($r = mysqli_fetch_assoc($q_ruangan)) { 
             ?>
-                <a href="ruangan.php?id=<?= $r['id']; ?>" class="menu-item">
+                <a href="ruangan/index.php?id=<?= $r['id_ruangan']; ?>" class="menu-item">
                     <div class="menu-left">
                         <i class="ph ph-house"></i> <?= htmlspecialchars($r['nama_ruangan']); ?>
                     </div>
@@ -131,7 +129,7 @@ $q_ruangan = mysqli_query($koneksi, "
         <div class="sidebar-footer">
             <div class="menu-label" style="margin: 0 0 10px 0;">Sekolah</div>
             <h4>SMK TARUNA BANGSA</h4>
-            <p>Tahun Ajaran 2024/2025</p>
+            <p>Tahun Ajaran 2025/2026</p>
         </div>
     </aside>
 
@@ -151,21 +149,26 @@ $q_ruangan = mysqli_query($koneksi, "
         <div class="dashboard-container">
             <div class="page-header">
                 <h1>Daftar Inventaris</h1>
-                <p>Total <?= mysqli_num_rows($result_barang); ?> jenis barang tercatat dalam sistem</p>
+                <p>Total <?= $result_barang ? mysqli_num_rows($result_barang) : 0; ?> jenis barang tercatat dalam sistem</p>
             </div>
 
-            <form method="GET" action="inventaris.php" class="filter-bar" style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+            <form method="GET" action="daftar-inventaris.php" class="filter-bar" style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
                 <div style="flex: 1; min-width: 250px; position: relative;">
                     <input type="text" name="search" placeholder="Cari nama, kode, atau lokasi..." value="<?= htmlspecialchars($search); ?>" style="width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;">
                 </div>
 
                 <select name="kategori" onchange="this.form.submit()" style="padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;">
                     <option value="">Semua Kategori</option>
-                    <?php while ($kat = mysqli_fetch_assoc($q_filter_kategori)) { ?>
-                        <option value="<?= $kat['id']; ?>" <?= ($kategori == $kat['id']) ? 'selected' : ''; ?>>
-                            <?= htmlspecialchars($kat['nama_kategori']); ?>
-                        </option>
-                    <?php } ?>
+                    <?php 
+                    if ($q_filter_kategori) {
+                        while ($kat = mysqli_fetch_assoc($q_filter_kategori)) { ?>
+                            <option value="<?= $kat['id_kategori']; ?>" <?= ($kategori == $kat['id_kategori']) ? 'selected' : ''; ?>>
+                                <?= htmlspecialchars($kat['nama_kategori']); ?>
+                            </option>
+                        <?php 
+                        } 
+                    }
+                    ?>
                 </select>
 
                 <select name="kondisi" onchange="this.form.submit()" style="padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;">
@@ -176,7 +179,7 @@ $q_ruangan = mysqli_query($koneksi, "
                 </select>
 
                 <?php if (!empty($search) || !empty($kategori) || !empty($kondisi)) { ?>
-                    <a href="inventaris.php" style="padding: 10px 14px; background: #eee; color: #333; text-decoration: none; border-radius: 8px; font-size: 14px;">Reset</a>
+                    <a href="daftar-inventaris.php" style="padding: 10px 14px; background: #eee; color: #333; text-decoration: none; border-radius: 8px; font-size: 14px;">Reset</a>
                 <?php } ?>
             </form>
 
@@ -196,10 +199,9 @@ $q_ruangan = mysqli_query($koneksi, "
                     </thead>
                     <tbody>
                         <?php 
-                        if (mysqli_num_rows($result_barang) > 0) {
+                        if ($result_barang && mysqli_num_rows($result_barang) > 0) {
                             $no = 1;
                             while ($row = mysqli_fetch_assoc($result_barang)) { 
-                                // Menentukan badge kondisi
                                 $badge_class = 'green';
                                 $kondisi_text = $row['daftar_kondisi'] ?? 'Baik';
                                 
@@ -227,9 +229,9 @@ $q_ruangan = mysqli_query($koneksi, "
                                 <td style="padding: 14px 18px; color: #475569;"><?= htmlspecialchars($row['nama_ruangan'] ?? '-'); ?></td>
                                 <td style="padding: 14px 18px; text-align: center;">
                                     <div style="display: flex; gap: 6px; justify-content: center;">
-                                        <a href="detail_barang.php?id=<?= $row['inventaris_id']; ?>" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; text-decoration: none; color: #334155; font-size: 12px; font-weight: 500;">Detail</a>
-                                        <a href="edit_barang.php?id=<?= $row['inventaris_id']; ?>" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; text-decoration: none; color: #334155; font-size: 12px; font-weight: 500;">Edit</a>
-                                        <a href="hapus_barang.php?id=<?= $row['inventaris_id']; ?>" onclick="return confirm('Apakah Anda yakin ingin menghapus barang ini?')" style="padding: 6px 10px; border: 1px solid #fecaca; background: #fef2f2; border-radius: 6px; text-decoration: none; color: #dc2626; font-size: 12px; font-weight: 500;">Hapus</a>
+                                        <a href="detail-barang.php?id=<?= $row['id_inventaris']; ?>" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; text-decoration: none; color: #334155; font-size: 12px; font-weight: 500;">Detail</a>
+                                        <a href="edit-barang.php?id=<?= $row['id_inventaris']; ?>" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; text-decoration: none; color: #334155; font-size: 12px; font-weight: 500;">Edit</a>
+                                        <a href="hapus-barang.php?id=<?= $row['id_inventaris']; ?>" onclick="return confirm('Apakah Anda yakin ingin menghapus barang ini?')" style="padding: 6px 10px; border: 1px solid #fecaca; background: #fef2f2; border-radius: 6px; text-decoration: none; color: #dc2626; font-size: 12px; font-weight: 500;">Hapus</a>
                                     </div>
                                 </td>
                             </tr>

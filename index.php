@@ -1,7 +1,7 @@
 <?php
 include 'config/koneksi.php';
 
-// 1. Query Statistik Utama (Dioptimasi jadi 1 Query biar efisien)
+// 1. Query Statistik Utama (Total Barang & Kondisi)
 $q_stats = mysqli_query($koneksi, "
     SELECT 
         COUNT(*) AS total_barang,
@@ -19,29 +19,29 @@ $rusak_berat   = $d_stats['rusak_berat'] ?? 0;
 
 $persen_baik  = ($total_barang > 0) ? round(($kondisi_baik / $total_barang) * 100) : 0;
 
-// 2. Total Jenis Barang
+// 2. Total Jenis Barang (Dari tabel master inventaris)
 $q_jenis = mysqli_query($koneksi, "SELECT COUNT(*) AS total_jenis FROM inventaris");
 $d_jenis = mysqli_fetch_assoc($q_jenis);
 $total_jenis = $d_jenis['total_jenis'] ?? 0;
 
 // 3. Top Kategori Barang
 $q_top_kategori = mysqli_query($koneksi, "
-    SELECT k.nama_kategori, COUNT(d.id) AS total_unit
+    SELECT k.nama_kategori, COUNT(d.id_detail) AS total_unit
     FROM detail_inventaris d
-    JOIN inventaris i ON d.inventaris_id = i.id
-    JOIN kategori k ON i.kategori_id = k.id
-    GROUP BY k.id
+    JOIN inventaris i ON d.id_inventaris = i.id_inventaris
+    JOIN kategori k ON i.id_kategori = k.id_kategori
+    GROUP BY k.id_kategori
     ORDER BY total_unit DESC
     LIMIT 5
 ");
 
-// 4. Query List Ruangan + Jumlah Barang Per Ruangan (Untuk Sidebar Dinamis)
+// 4. Query List Ruangan + Jumlah Barang Per Ruangan (Sidebar Dinamis)
 $q_ruangan = mysqli_query($koneksi, "
-    SELECT r.id, r.nama_ruangan, COUNT(d.id) AS total_barang
+    SELECT r.id_ruangan, r.nama_ruangan, COUNT(d.id_detail) AS total_barang
     FROM ruangan r
-    LEFT JOIN inventaris i ON r.id = i.ruangan_id
-    LEFT JOIN detail_inventaris d ON i.id = d.inventaris_id
-    GROUP BY r.id
+    LEFT JOIN inventaris i ON r.id_ruangan = i.id_ruangan
+    LEFT JOIN detail_inventaris d ON i.id_inventaris = d.id_inventaris
+    GROUP BY r.id_ruangan, r.nama_ruangan
     ORDER BY r.nama_ruangan ASC
 ");
 ?>
@@ -98,10 +98,10 @@ $q_ruangan = mysqli_query($koneksi, "
             </div>
             
             <?php 
-            if (mysqli_num_rows($q_ruangan) > 0) {
+            if ($q_ruangan && mysqli_num_rows($q_ruangan) > 0) {
                 while ($r = mysqli_fetch_assoc($q_ruangan)) { 
             ?>
-                <a href="ruangan.php?id=<?= $r['id']; ?>" class="menu-item">
+                <a href="ruangan/index.php?id=<?= $r['id_ruangan']; ?>" class="menu-item">
                     <div class="menu-left">
                         <i class="ph ph-house"></i> <?= htmlspecialchars($r['nama_ruangan']); ?>
                     </div>
@@ -185,7 +185,7 @@ $q_ruangan = mysqli_query($koneksi, "
                     <h3>Top Kategori Barang</h3>
 
                     <?php
-                    if (mysqli_num_rows($q_top_kategori) > 0) {
+                    if ($q_top_kategori && mysqli_num_rows($q_top_kategori) > 0) {
                         while ($row = mysqli_fetch_assoc($q_top_kategori)) {
                             $persen_bar = ($total_barang > 0) ? round(($row['total_unit'] / $total_barang) * 100) : 0;
                             ?>
