@@ -4,71 +4,123 @@ include 'config/koneksi.php';
 $pesan_sukses = "";
 $pesan_error = "";
 
-// QUERY DROPDOWN & SIDEBAR
-$q_barang_katalog = mysqli_query($koneksi, "SELECT * FROM barang ORDER BY nama_barang ASC");
-$q_kategori       = mysqli_query($koneksi, "SELECT * FROM kategori ORDER BY nama_kategori ASC");
-$q_ruangan_option  = mysqli_query($koneksi, "SELECT * FROM ruangan ORDER BY nama_ruangan ASC");
+// MODE PAGE: master barang atau tambah unit ke ruangan
+$id_ruangan = isset($_GET['id_ruangan']) ? (int) $_GET['id_ruangan'] : (isset($_POST['id_ruangan']) ? (int) $_POST['id_ruangan'] : 0);
+$current_year = date('Y');
 
 // Query Ruangan untuk Sidebar
 $q_ruangan_sidebar = mysqli_query($koneksi, "
-    SELECT r.id_ruangan, r.nama_ruangan, COUNT(d.id_detail) AS total_barang 
+    SELECT r.id_ruangan, r.nama_ruangan, COUNT(i.id_inventaris) AS total_barang 
     FROM ruangan r 
-    LEFT JOIN inventaris i ON r.id_ruangan = i.id_ruangan 
-    LEFT JOIN detail_inventaris d ON i.id_inventaris = d.id_inventaris 
+    LEFT JOIN inventaris i ON r.id_ruangan = i.ruangan_id 
     GROUP BY r.id_ruangan, r.nama_ruangan
 ");
 
+if ($id_ruangan > 0) {
+    $q_ruangan_detail = mysqli_query($koneksi, "SELECT * FROM ruangan WHERE id_ruangan = '$id_ruangan' LIMIT 1");
+    $ruangan = mysqli_fetch_assoc($q_ruangan_detail);
+    if (!$ruangan) {
+        header('Location: tambah-barang.php');
+        exit;
+    }
+    $q_barang_katalog = mysqli_query($koneksi, "SELECT * FROM barang ORDER BY nama_barang ASC");
+} else {
+    $q_kategori = mysqli_query($koneksi, "SELECT * FROM kategori ORDER BY nama_kategori ASC");
+}
+
 // PROSES FORM SUBMIT
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $id_barang       = (int) $_POST['id_barang'];
-    $kode_barang     = mysqli_real_escape_string($koneksi, $_POST['kode_barang']);
-    $id_kategori     = (int) $_POST['id_kategori'];
-    $kondisi         = mysqli_real_escape_string($koneksi, $_POST['kondisi']);
-    $jumlah          = (int) $_POST['jumlah'];
-    $satuan          = mysqli_real_escape_string($koneksi, $_POST['satuan']);
-    $id_ruangan      = (int) $_POST['id_ruangan'];
-    $tahun_perolehan = (int) $_POST['tahun_perolehan'];
-    $keterangan      = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
+    if ($id_ruangan > 0) {
+        $id_barang       = isset($_POST['id_barang']) ? (int) $_POST['id_barang'] : 0;
+        $jumlah          = isset($_POST['jumlah']) ? (int) $_POST['jumlah'] : 0;
+        $tahun_perolehan = isset($_POST['tahun_perolehan']) ? (int) $_POST['tahun_perolehan'] : $current_year;
+        $keterangan      = mysqli_real_escape_string($koneksi, $_POST['keterangan'] ?? '');
 
-    // Validasi Sederhana Input Wajib
-    if ($id_barang == 0 || $id_kategori == 0 || $id_ruangan == 0 || empty($kode_barang)) {
-        $pesan_error = "Harap lengkapi semua pilihan wajib (Nama Barang, Kategori, dan Ruangan)!";
-    } else {
-        // Ambil nama barang dari tabel master
-        $q_get_nama  = mysqli_query($koneksi, "SELECT nama_barang FROM barang WHERE id_barang = '$id_barang'");
-        $d_get_nama  = mysqli_fetch_assoc($q_get_nama);
-        $nama_barang = $d_get_nama ? mysqli_real_escape_string($koneksi, $d_get_nama['nama_barang']) : '';
+        if ($id_barang === 0 || $jumlah <= 0) {
+            $pesan_error = "Harap pilih jenis barang dan masukkan jumlah unit yang valid.";
+        } else {
+            $q_barang = mysqli_query($koneksi, "SELECT * FROM barang WHERE id_barang = '$id_barang' LIMIT 1");
+            $barang = mysqli_fetch_assoc($q_barang);
 
-        // 1. Simpan ke Tabel Inventaris
-        $query_inv = "INSERT INTO inventaris (id_barang, kode_barang, nama_barang, id_kategori, satuan, id_ruangan, tahun_perolehan, deskripsi) 
-                      VALUES ('$id_barang', '$kode_barang', '$nama_barang', '$id_kategori', '$satuan', '$id_ruangan', '$tahun_perolehan', '$keterangan')";
+            if (!$barang) {
+                $pesan_error = "Barang tidak ditemukan. Silakan pilih barang yang valid.";
+            } elseif (empty(trim($barang['kode_barang']))) {
+                $pesan_error = "Barang yang dipilih belum memiliki kode master. Silakan lengkapi data barang terlebih dahulu.";
+            } else {
+                $kode_master = trim($barang['kode_barang']);
+                $ruangan_code = preg_replace('/[^A-Za-z0-9]/', '', strtoupper($ruangan['nama_ruangan']));
+                if ($ruangan_code === '') {
+                    $ruangan_code = $ruangan['id_ruangan'];
+                }
 
-        if (mysqli_query($koneksi, $query_inv)) {
-            $inventaris_id = mysqli_insert_id($koneksi);
+                $like_pattern = $kode_master . '-' . $ruangan_code . '-%';
+                $q_last = mysqli_query($koneksi, "SELECT barcode FROM inventaris WHERE barang_id = '$id_barang' AND ruangan_id = '$id_ruangan' AND barcode LIKE '$like_pattern' ORDER BY id_inventaris DESC LIMIT 1");
+                $next_seq = 1;
 
-            // 2. Generate Detail Unit Fisik ke detail_inventaris
-            $sukses_detail = true;
-            for ($i = 1; $i <= $jumlah; $i++) {
-                $kode_barcode = $kode_barang . "-" . str_pad($i, 2, "0", STR_PAD_LEFT);
+                if ($q_last && mysqli_num_rows($q_last) > 0) {
+                    $d_last = mysqli_fetch_assoc($q_last);
+                    $parts = explode('-', $d_last['barcode']);
+                    $last_seq = (int) end($parts);
+                    $next_seq = max(1, $last_seq + 1);
+                }
 
-                $query_detail = "INSERT INTO detail_inventaris (id_inventaris, kode_barcode, kondisi, keterangan) 
-                                 VALUES ('$inventaris_id', '$kode_barcode', '$kondisi', '$keterangan')";
+                $kode_awal = $kode_master . '-' . $ruangan_code . '-' . str_pad($next_seq, 3, '0', STR_PAD_LEFT);
+                $saved = 0;
+                $errors = [];
 
-                if (!mysqli_query($koneksi, $query_detail)) {
-                    $sukses_detail = false;
-                    $error_detail_msg = mysqli_error($koneksi);
-                    break;
+                for ($i = 0; $i < $jumlah; $i++) {
+                    $seq = $next_seq + $i;
+                    $barcode = $kode_master . '-' . $ruangan_code . '-' . str_pad($seq, 3, '0', STR_PAD_LEFT);
+                    $query_inv = "INSERT INTO inventaris (barang_id, ruangan_id, tahun_perolehan, kondisi, keterangan, barcode) VALUES ('$id_barang', '$id_ruangan', '$tahun_perolehan', 'baik', '$keterangan', '$barcode')";
+
+                    if (mysqli_query($koneksi, $query_inv)) {
+                        $saved++;
+                    } else {
+                        $errors[] = mysqli_error($koneksi);
+                        break;
+                    }
+                }
+
+                if ($saved === $jumlah) {
+                    $pesan_sukses = "Berhasil menambahkan $jumlah unit barang ke ruangan " . htmlspecialchars($ruangan['nama_ruangan']) . ". Kode mulai dari $kode_awal.";
+                } else {
+                    $pesan_error = "Gagal menyimpan semua unit. " . implode(' ', $errors);
                 }
             }
+        }
+    } else {
+        $nama_barang = trim(mysqli_real_escape_string($koneksi, $_POST['nama_barang'] ?? ''));
+        $id_kategori = isset($_POST['id_kategori']) ? (int) $_POST['id_kategori'] : 0;
+        $kode_barang = trim(mysqli_real_escape_string($koneksi, $_POST['kode_barang'] ?? ''));
+        $keterangan  = mysqli_real_escape_string($koneksi, $_POST['keterangan'] ?? '');
 
-            if ($sukses_detail) {
-                $pesan_sukses = "Data barang berhasil disimpan beserta $jumlah unit detail fisiknya!";
-            } else {
-                $pesan_error = "Barang utama tersimpan, namun gagal membuat detail fisik: " . $error_detail_msg;
-            }
+        if ($nama_barang === '' || $id_kategori <= 0 || $kode_barang === '') {
+            $pesan_error = "Silakan lengkapi Nama Barang, Kategori, dan Kode Barang.";
         } else {
-            // Tampilkan error database secara spesifik
-            $pesan_error = "Gagal menyimpan ke tabel inventaris: " . mysqli_error($koneksi);
+            $q_kategori_check = mysqli_query($koneksi, "SELECT id_kategori FROM kategori WHERE id_kategori = '$id_kategori' LIMIT 1");
+            if ($q_kategori_check && mysqli_num_rows($q_kategori_check) > 0) {
+                $id_kategori = (int) mysqli_fetch_assoc($q_kategori_check)['id_kategori'];
+            } else {
+                $pesan_error = "Kategori tidak valid. Silakan pilih kategori yang tersedia.";
+            }
+        }
+
+        if (empty($pesan_error)) {
+            $cek_kode = mysqli_query($koneksi, "SELECT id_barang FROM barang WHERE kode_barang = '$kode_barang' LIMIT 1");
+            if ($cek_kode && mysqli_num_rows($cek_kode) > 0) {
+                $pesan_error = "Kode Barang sudah dipakai. Silakan gunakan kode lain.";
+            } else {
+                $query_barang = "INSERT INTO barang (nama_barang, kategori_id, deskripsi, kode_barang) VALUES ('$nama_barang', '$id_kategori', '$keterangan', '$kode_barang')";
+                if (mysqli_query($koneksi, $query_barang)) {
+                    $pesan_sukses = "Master barang berhasil ditambahkan.";
+                    $nama_barang = '';
+                    $id_kategori = 0;
+                    $kode_barang = '';
+                    $keterangan = '';
+                } else {
+                    $pesan_error = "Gagal menyimpan master barang: " . mysqli_error($koneksi);
+                }
+            }
         }
     }
 }
@@ -93,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <i class="ph-bold ph-archive-box"></i>
             </div>
             <div class="brand-text">
-                <h2>SIVENPRAS</h2>
+                <h2>SIVENPRAS-TB</h2>
                 <p>Sistem Inventaris Sarpras</p>
             </div>
         </div>
@@ -155,125 +207,97 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
             <?php } ?>
 
-            <form method="POST" action="tambah-barang.php" class="widget-card" style="padding: 24px; max-width: 900px; background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <form method="POST" action="tambah-barang.php<?= $id_ruangan > 0 ? '?id_ruangan=' . $id_ruangan : '' ?>" class="widget-card" style="padding: 24px; max-width: 900px; background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <?php if ($id_ruangan > 0) : ?>
+                    <input type="hidden" name="id_ruangan" value="<?= $id_ruangan; ?>">
+                    <div style="margin-bottom: 24px;">
+                        <h4 style="color: #0f172a; margin-bottom: 16px; font-size: 14px; letter-spacing: 0.5px; border-left: 3px solid #0d9488; padding-left: 8px;">
+                            TAMBAH UNIT BARANG DI RUANGAN <?= htmlspecialchars($ruangan['nama_ruangan']); ?>
+                        </h4>
 
-                <div style="margin-bottom: 24px;">
-                    <h4 style="color: #0f172a; margin-bottom: 16px; font-size: 14px; letter-spacing: 0.5px; border-left: 3px solid #0d9488; padding-left: 8px;">
-                        IDENTITAS BARANG
-                    </h4>
-
-                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px;">
-                        <div>
-                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
-                                NAMA BARANG KATALOG <span style="color:red;">*</span>
-                            </label>
-                            <select name="id_barang" id="id_barang" onchange="generateKodeOtomatis()" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
-                                <option value="">-- Pilih Barang --</option>
-                                <?php while ($b = mysqli_fetch_assoc($q_barang_katalog)) { ?>
-                                    <option value="<?= $b['id_barang']; ?>"><?= htmlspecialchars($b['nama_barang']); ?></option>
-                                <?php } ?>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
-                                KODE BARANG
-                            </label>
-                            <input type="text" name="kode_barang" id="kode_barang" readonly placeholder="Kode Otomatis..." style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: #f8fafc; font-weight: 600;">
+                        <div style="display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px;">
+                            <div>
+                                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+                                    NAMA BARANG <span style="color:red;">*</span>
+                                </label>
+                                <select name="id_barang" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                                    <option value="">-- Pilih Barang --</option>
+                                    <?php while ($b = mysqli_fetch_assoc($q_barang_katalog)) { ?>
+                                        <option value="<?= $b['id_barang']; ?>"><?= htmlspecialchars($b['nama_barang']); ?> (<?= htmlspecialchars($b['kode_barang']); ?>)</option>
+                                    <?php } ?>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+                                    JUMLAH UNIT <span style="color:red;">*</span>
+                                </label>
+                                <input type="number" name="jumlah" value="1" min="1" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                            </div>
                         </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                        <div>
-                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
-                                KATEGORI <span style="color:red;">*</span>
-                            </label>
-                            <select name="id_kategori" id="id_kategori" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
-                                <option value="">-- Pilih Kategori --</option>
-                                <?php while ($k = mysqli_fetch_assoc($q_kategori)) { ?>
-                                    <option value="<?= $k['id_kategori']; ?>"><?= htmlspecialchars($k['nama_kategori']); ?></option>
-                                <?php } ?>
-                            </select>
+                    <div style="margin-bottom: 24px;">
+                        <h4 style="color: #0f172a; margin-bottom: 16px; font-size: 14px; letter-spacing: 0.5px; border-left: 3px solid #0d9488; padding-left: 8px;">
+                            DATA PEROLEHAN
+                        </h4>
+
+                        <div style="display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px;">
+                            <div>
+                                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+                                    TAHUN PEROLEHAN
+                                </label>
+                                <input type="number" name="tahun_perolehan" value="<?= $current_year; ?>" min="2000" max="2099" style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                            </div>
                         </div>
+
                         <div>
-                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
-                                KONDISI BARANG <span style="color:red;">*</span>
-                            </label>
-                            <select name="kondisi" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
-                                <option value="Baik">Baik</option>
-                                <option value="Rusak Ringan">Rusak Ringan</option>
-                                <option value="Rusak Berat">Rusak Berat</option>
-                                <option value="Tidak Layak">Tidak Layak</option>
-                            </select>
+                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">KETERANGAN</label>
+                            <textarea name="keterangan" rows="3" placeholder="Catatan tambahan tentang unit ini (opsional)" style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; resize: vertical;"></textarea>
                         </div>
                     </div>
-                </div>
+                <?php else : ?>
+                    <div style="margin-bottom: 24px;">
+                        <h4 style="color: #0f172a; margin-bottom: 16px; font-size: 14px; letter-spacing: 0.5px; border-left: 3px solid #0d9488; padding-left: 8px;">
+                            TAMBAH MASTER BARANG
+                        </h4>
 
-                <div style="margin-bottom: 24px;">
-                    <h4 style="color: #0f172a; margin-bottom: 16px; font-size: 14px; letter-spacing: 0.5px; border-left: 3px solid #0d9488; padding-left: 8px;">
-                        DETAIL & LOKASI
-                    </h4>
+                        <div style="display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px;">
+                            <div>
+                                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+                                    NAMA BARANG <span style="color:red;">*</span>
+                                </label>
+                                <input type="text" name="nama_barang" value="<?= htmlspecialchars($nama_barang ?? ''); ?>" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+                                    KODE BARANG <span style="color:red;">*</span>
+                                </label>
+                                <input type="text" name="kode_barang" value="<?= htmlspecialchars($kode_barang ?? ''); ?>" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+                                    KATEGORI <span style="color:red;">*</span>
+                                </label>
+                                <select name="id_kategori" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                                    <option value="">-- Pilih Kategori --</option>
+                                    <?php while ($k = mysqli_fetch_assoc($q_kategori)) { ?>
+                                        <option value="<?= $k['id_kategori']; ?>" <?= isset($id_kategori) && $id_kategori == $k['id_kategori'] ? 'selected' : ''; ?>><?= htmlspecialchars($k['nama_kategori']); ?></option>
+                                    <?php } ?>
+                                </select>
+                            </div>
+                        </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
                         <div>
-                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
-                                JUMLAH <span style="color:red;">*</span>
-                            </label>
-                            <input type="number" name="jumlah" value="1" min="1" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
-                        </div>
-                        <div>
-                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">SATUAN</label>
-                            <select name="satuan" style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
-                                <option value="Unit">Unit</option>
-                                <option value="Buah">Buah</option>
-                                <option value="Set">Set</option>
-                                <option value="Pcs">Pcs</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
-                                LOKASI / RUANGAN <span style="color:red;">*</span>
-                            </label>
-                            <select name="id_ruangan" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
-                                <option value="">-- Pilih Ruangan --</option>
-                                <?php while ($r = mysqli_fetch_assoc($q_ruangan_option)) { ?>
-                                    <option value="<?= $r['id_ruangan']; ?>"><?= htmlspecialchars($r['nama_ruangan']); ?></option>
-                                <?php } ?>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="margin-bottom: 24px;">
-                    <h4 style="color: #0f172a; margin-bottom: 16px; font-size: 14px; letter-spacing: 0.5px; border-left: 3px solid #0d9488; padding-left: 8px;">
-                        DATA PEROLEHAN
-                    </h4>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-                        <div>
-                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
-                                TAHUN PEROLEHAN <span style="color:red;">*</span>
-                            </label>
-                            <input type="number" name="tahun_perolehan" value="<?= date('Y'); ?>" min="2000" max="2099" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
-                        </div>
-                        <div>
-                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
-                                NILAI PEROLEHAN (RP / UNIT)
-                            </label>
-                            <input type="number" name="nilai_perolehan" value="0" style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">KETERANGAN</label>
+                            <textarea name="keterangan" rows="3" placeholder="Catatan tambahan tentang barang ini (opsional)" style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; resize: vertical;"><?= htmlspecialchars($keterangan ?? ''); ?></textarea>
                         </div>
                     </div>
-
-                    <div>
-                        <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">KETERANGAN</label>
-                        <textarea name="keterangan" rows="3" placeholder="Catatan tambahan tentang barang ini (opsional)" style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; resize: vertical;"></textarea>
-                    </div>
-                </div>
+                <?php endif; ?>
 
                 <div style="display: flex; gap: 12px; justify-content: flex-end; border-top: 1px solid #f1f5f9; padding-top: 16px;">
                     <a href="daftar-inventaris.php" style="padding: 10px 20px; border: 1px solid #cbd5e1; border-radius: 8px; text-decoration: none; color: #475569; font-weight: 600; font-size: 14px;">Batal</a>
                     <button type="submit" class="btn-primary" style="padding: 10px 24px; font-size: 14px; cursor: pointer;">Simpan Barang</button>
                 </div>
-
             </form>
         </div>
     </main>

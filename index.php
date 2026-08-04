@@ -5,10 +5,10 @@ include 'config/koneksi.php';
 $q_stats = mysqli_query($koneksi, "
     SELECT 
         COUNT(*) AS total_barang,
-        SUM(CASE WHEN kondisi = 'Baik' THEN 1 ELSE 0 END) AS kondisi_baik,
-        SUM(CASE WHEN kondisi = 'Rusak Ringan' THEN 1 ELSE 0 END) AS rusak_ringan,
-        SUM(CASE WHEN kondisi = 'Rusak Berat' THEN 1 ELSE 0 END) AS rusak_berat
-    FROM detail_inventaris
+        SUM(CASE WHEN kondisi = 'baik' THEN 1 ELSE 0 END) AS kondisi_baik,
+        SUM(CASE WHEN kondisi = 'rusak' THEN 1 ELSE 0 END) AS rusak_ringan,
+        SUM(CASE WHEN kondisi = 'hilang' THEN 1 ELSE 0 END) AS rusak_berat
+    FROM inventaris
 ");
 $d_stats = mysqli_fetch_assoc($q_stats);
 
@@ -19,17 +19,17 @@ $rusak_berat   = $d_stats['rusak_berat'] ?? 0;
 
 $persen_baik  = ($total_barang > 0) ? round(($kondisi_baik / $total_barang) * 100) : 0;
 
-// 2. Total Jenis Barang (Dari tabel master inventaris)
-$q_jenis = mysqli_query($koneksi, "SELECT COUNT(*) AS total_jenis FROM inventaris");
+// 2. Total Jenis Barang (Dari tabel master barang)
+$q_jenis = mysqli_query($koneksi, "SELECT COUNT(*) AS total_jenis FROM barang");
 $d_jenis = mysqli_fetch_assoc($q_jenis);
 $total_jenis = $d_jenis['total_jenis'] ?? 0;
 
 // 3. Top Kategori Barang
 $q_top_kategori = mysqli_query($koneksi, "
-    SELECT k.nama_kategori, COUNT(d.id_detail) AS total_unit
-    FROM detail_inventaris d
-    JOIN inventaris i ON d.id_inventaris = i.id_inventaris
-    JOIN kategori k ON i.id_kategori = k.id_kategori
+    SELECT k.nama_kategori, COUNT(i.id_inventaris) AS total_unit
+    FROM inventaris i
+    JOIN barang b ON i.barang_id = b.id_barang
+    JOIN kategori k ON b.kategori_id = k.id_kategori
     GROUP BY k.id_kategori
     ORDER BY total_unit DESC
     LIMIT 5
@@ -37,10 +37,9 @@ $q_top_kategori = mysqli_query($koneksi, "
 
 // 4. Query List Ruangan + Jumlah Barang Per Ruangan (Sidebar Dinamis)
 $q_ruangan = mysqli_query($koneksi, "
-    SELECT r.id_ruangan, r.nama_ruangan, COUNT(d.id_detail) AS total_barang
+    SELECT r.id_ruangan, r.nama_ruangan, COUNT(i.id_inventaris) AS total_barang
     FROM ruangan r
-    LEFT JOIN inventaris i ON r.id_ruangan = i.id_ruangan
-    LEFT JOIN detail_inventaris d ON i.id_inventaris = d.id_inventaris
+    LEFT JOIN inventaris i ON r.id_ruangan = i.ruangan_id
     GROUP BY r.id_ruangan, r.nama_ruangan
     ORDER BY r.nama_ruangan ASC
 ");
@@ -65,7 +64,7 @@ $q_ruangan = mysqli_query($koneksi, "
                 <i class="ph-bold ph-archive-box"></i>
             </div>
             <div class="brand-text">
-                <h2>SIVENPRAS</h2>
+                <h2>SIVENPRAS-TB</h2>
                 <p>Sistem Inventaris Sarpras</p>
             </div>
         </div>
@@ -101,7 +100,7 @@ $q_ruangan = mysqli_query($koneksi, "
             if ($q_ruangan && mysqli_num_rows($q_ruangan) > 0) {
                 while ($r = mysqli_fetch_assoc($q_ruangan)) { 
             ?>
-                <a href="ruangan/index.php?id=<?= $r['id_ruangan']; ?>" class="menu-item">
+                <a href="ruangan.php?id=<?= $r['id_ruangan']; ?>" class="menu-item">
                     <div class="menu-left">
                         <i class="ph ph-house"></i> <?= htmlspecialchars($r['nama_ruangan']); ?>
                     </div>

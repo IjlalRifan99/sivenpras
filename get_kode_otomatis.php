@@ -10,36 +10,49 @@ if (ob_get_length()) ob_clean();
 
 if (isset($_POST['id_barang']) && !empty($_POST['id_barang'])) {
     $id_barang = (int)$_POST['id_barang'];
+    $id_ruangan = isset($_POST['id_ruangan']) ? (int)$_POST['id_ruangan'] : 0;
 
     // 1. Ambil data dari tabel master barang
     $q_barang = mysqli_query($koneksi, "SELECT * FROM barang WHERE id_barang = '$id_barang'");
     
     if ($q_barang && mysqli_num_rows($q_barang) > 0) {
         $d_barang = mysqli_fetch_assoc($q_barang);
-        $kode_master = $d_barang['kode_barang']; // Misal: 'KR', 'MJ', 'LTP'
+        $kode_master = trim($d_barang['kode_barang']);
 
-        // 2. Cari kode_barang terakhir di tabel inventaris yang diawali kode_master tersebut
-        $q_max = mysqli_query($koneksi, "SELECT kode_barang FROM inventaris WHERE kode_barang LIKE '$kode_master-%' ORDER BY id_inventaris DESC LIMIT 1");
-        
-        if ($q_max && mysqli_num_rows($q_max) > 0) {
-            $d_max = mysqli_fetch_assoc($q_max);
-            // Ambil angka setelah tanda '-'
-            $exp = explode('-', $d_max['kode_barang']);
-            $no_urut = (int) end($exp);
-            $no_next = $no_urut + 1;
+        // default kategori_id
+        $kat_id = intval($d_barang['kategori_id'] ?? 0);
+        $kode_baru = '';
+
+        if ($id_ruangan > 0) {
+            $q_ruangan = mysqli_query($koneksi, "SELECT nama_ruangan FROM ruangan WHERE id_ruangan = '$id_ruangan' LIMIT 1");
+            $d_ruangan = mysqli_fetch_assoc($q_ruangan);
+            $ruangan_code = 'R' . $id_ruangan;
+            if ($d_ruangan) {
+                $ruangan_code = preg_replace('/[^A-Za-z0-9]/', '', strtoupper($d_ruangan['nama_ruangan']));
+                if ($ruangan_code === '') {
+                    $ruangan_code = 'R' . $id_ruangan;
+                }
+            }
+
+            $like_pattern = $kode_master . '-' . $ruangan_code . '-%';
+            $q_max = mysqli_query($koneksi, "SELECT barcode FROM inventaris WHERE barang_id = '$id_barang' AND ruangan_id = '$id_ruangan' AND barcode LIKE '$like_pattern' ORDER BY id_inventaris DESC LIMIT 1");
         } else {
-            $no_next = 1;
+            $like_pattern = $kode_master . '-%';
+            $q_max = mysqli_query($koneksi, "SELECT barcode FROM inventaris WHERE barang_id = '$id_barang' AND barcode LIKE '$like_pattern' ORDER BY id_inventaris DESC LIMIT 1");
         }
 
-        // Format kode baru: KR-001, KR-002, dst.
-        $kode_baru = $kode_master . "-" . str_pad($no_next, 3, "0", STR_PAD_LEFT);
+        $no_next = 1;
+        if ($q_max && mysqli_num_rows($q_max) > 0) {
+            $d_max = mysqli_fetch_assoc($q_max);
+            $parts = explode('-', $id_ruangan > 0 ? $d_max['barcode'] : $d_max['barcode']);
+            $last_seq = intval(end($parts));
+            $no_next = max(1, $last_seq + 1);
+        }
 
-        // Ambil ID Kategori
-        $kat_id = 0;
-        if (isset($d_barang['kategori_id'])) {
-            $kat_id = $d_barang['kategori_id'];
-        } elseif (isset($d_barang['id_kategori'])) {
-            $kat_id = $d_barang['id_kategori'];
+        if ($id_ruangan > 0) {
+            $kode_baru = $kode_master . '-' . $ruangan_code . '-' . str_pad($no_next, 3, '0', STR_PAD_LEFT);
+        } else {
+            $kode_baru = $kode_master . '-' . str_pad($no_next, 3, '0', STR_PAD_LEFT);
         }
 
         echo json_encode([

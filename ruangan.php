@@ -10,6 +10,32 @@ if ($id_ruangan == 0) {
     exit;
 }
 
+// Update kondisi inventaris bila ada form submit
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_kondisi'], $_POST['id_inventaris'])) {
+    $id_inventaris = (int)$_POST['id_inventaris'];
+    $normalized = strtolower(trim(preg_replace('/\s+/', ' ', $_POST['kondisi'])));
+    $kondisi = mysqli_real_escape_string($koneksi, $normalized);
+    $allowed = ['baik', 'cukup baik', 'rusak', 'rusak parah', 'hilang'];
+    $success = false;
+
+    if (in_array($kondisi, $allowed, true)) {
+        $success = (bool) mysqli_query($koneksi, "UPDATE inventaris SET kondisi = '$kondisi' WHERE id_inventaris = '$id_inventaris' AND ruangan_id = '$id_ruangan'");
+    }
+
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => $success,
+            'kondisi' => $kondisi,
+            'message' => $success ? 'Kondisi berhasil disimpan.' : 'Gagal menyimpan kondisi.'
+        ]);
+        exit;
+    }
+
+    header("Location: ruangan.php?id=$id_ruangan");
+    exit;
+}
+
 // 2. Ambil Informasi Ruangan Aktif
 $q_detail_ruangan = mysqli_query($koneksi, "SELECT * FROM ruangan WHERE id_ruangan = '$id_ruangan'");
 $d_ruangan = mysqli_fetch_assoc($q_detail_ruangan);
@@ -21,76 +47,71 @@ if (!$d_ruangan) {
 
 // 3. Query untuk Sidebar Ruangan (Hitung total unit fisik per ruangan)
 $q_ruangan_sidebar = mysqli_query($koneksi, "
-    SELECT r.id_ruangan, r.nama_ruangan, COUNT(d.id_detail) AS total_barang 
+    SELECT r.id_ruangan, r.nama_ruangan, COUNT(i.id_inventaris) AS total_barang 
     FROM ruangan r 
-    LEFT JOIN inventaris i ON r.id_ruangan = i.id_ruangan 
-    LEFT JOIN detail_inventaris d ON i.id_inventaris = d.id_inventaris 
+    LEFT JOIN inventaris i ON r.id_ruangan = i.ruangan_id 
     GROUP BY r.id_ruangan, r.nama_ruangan
 ");
 
 // 4. Query Menghitung Statistik Card Atas untuk Ruangan Ini
-// - Jenis Barang (Jumlah Record di Inventaris)
-$q_stat_jenis = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total_jenis FROM inventaris WHERE id_ruangan = '$id_ruangan'");
+// - Jenis Barang (Jumlah Jenis Master Barang berada di ruangan ini)
+$q_stat_jenis = mysqli_query($koneksi, "SELECT COUNT(DISTINCT barang_id) AS total_jenis FROM inventaris WHERE ruangan_id = '$id_ruangan'");
 $d_stat_jenis = mysqli_fetch_assoc($q_stat_jenis);
 $total_jenis = $d_stat_jenis['total_jenis'] ?? 0;
 
-// - Total Satuan (Jumlah Unit Fisik di detail_inventaris)
+// - Total Satuan (Jumlah Unit Fisik di inventaris)
 $q_stat_satuan = mysqli_query($koneksi, "
-    SELECT COUNT(d.id_detail) AS total_satuan 
-    FROM inventaris i 
-    JOIN detail_inventaris d ON i.id_inventaris = d.id_inventaris 
-    WHERE i.id_ruangan = '$id_ruangan'
+    SELECT COUNT(id_inventaris) AS total_satuan 
+    FROM inventaris 
+    WHERE ruangan_id = '$id_ruangan'
 ");
 $d_stat_satuan = mysqli_fetch_assoc($q_stat_satuan);
 $total_satuan = $d_stat_satuan['total_satuan'] ?? 0;
 
 // - Kondisi Baik
 $q_stat_baik = mysqli_query($koneksi, "
-    SELECT COUNT(d.id_detail) AS total_baik 
-    FROM inventaris i 
-    JOIN detail_inventaris d ON i.id_inventaris = d.id_inventaris 
-    WHERE i.id_ruangan = '$id_ruangan' AND d.kondisi = 'Baik'
+    SELECT COUNT(id_inventaris) AS total_baik 
+    FROM inventaris 
+    WHERE ruangan_id = '$id_ruangan' AND kondisi = 'baik'
 ");
 $d_stat_baik = mysqli_fetch_assoc($q_stat_baik);
 $total_baik = $d_stat_baik['total_baik'] ?? 0;
 
-// - Perlu Perhatian (Kondisi Rusak Ringan, Rusak Berat, Tidak Layak)
+// - Perlu Perhatian (Kondisi rusak atau hilang)
 $q_stat_perhatian = mysqli_query($koneksi, "
-    SELECT COUNT(d.id_detail) AS total_perhatian 
-    FROM inventaris i 
-    JOIN detail_inventaris d ON i.id_inventaris = d.id_inventaris 
-    WHERE i.id_ruangan = '$id_ruangan' AND d.kondisi != 'Baik'
+    SELECT COUNT(id_inventaris) AS total_perhatian 
+    FROM inventaris 
+    WHERE ruangan_id = '$id_ruangan' AND kondisi != 'baik'
 ");
 $d_stat_perhatian = mysqli_fetch_assoc($q_stat_perhatian);
 $total_perhatian = $d_stat_perhatian['total_perhatian'] ?? 0;
 
 
-// 5. Query Menampilkan Daftar Barang di Tabel
+// 5. Query Menampilkan Daftar Unit Inventaris di Ruangan
 // Menerima pencarian dari form jika ada
 $keyword = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
 
 $sql_list = "
     SELECT 
         i.id_inventaris,
-        i.kode_barang,
-        i.nama_barang,
-        i.satuan,
-        i.deskripsi,
-        k.nama_kategori,
-        COUNT(d.id_detail) AS jumlah_unit,
-        -- Mengambil kondisi terbanyak atau dominant kondisi
-        (SELECT kondisi FROM detail_inventaris WHERE id_inventaris = i.id_inventaris LIMIT 1) AS kondisi_utama
+        i.barcode,
+        i.kondisi,
+        i.keterangan AS keterangan_inventaris,
+        b.nama_barang,
+        b.kode_barang,
+        b.deskripsi,
+        k.nama_kategori
     FROM inventaris i
-    LEFT JOIN kategori k ON i.id_kategori = k.id_kategori
-    LEFT JOIN detail_inventaris d ON i.id_inventaris = d.id_inventaris
-    WHERE i.id_ruangan = '$id_ruangan'
+    JOIN barang b ON i.barang_id = b.id_barang
+    LEFT JOIN kategori k ON b.kategori_id = k.id_kategori
+    WHERE i.ruangan_id = '$id_ruangan'
 ";
 
 if (!empty($keyword)) {
-    $sql_list .= " AND (i.nama_barang LIKE '%$keyword%' OR i.kode_barang LIKE '%$keyword%' OR k.nama_kategori LIKE '%$keyword%')";
+    $sql_list .= " AND (i.barcode LIKE '%$keyword%' OR b.nama_barang LIKE '%$keyword%' OR k.nama_kategori LIKE '%$keyword%')";
 }
 
-$sql_list .= " GROUP BY i.id_inventaris ORDER BY i.id_inventaris DESC";
+$sql_list .= " ORDER BY i.barcode ASC";
 $q_list = mysqli_query($koneksi, $sql_list);
 ?>
 
@@ -138,8 +159,27 @@ $q_list = mysqli_query($koneksi, $sql_list);
             display: inline-block;
         }
         .badge-baik { background: #dcfce7; color: #15803d; }
-        .badge-rusak { background: #fee2e2; color: #b91c1c; }
+        .badge-cukup-baik { background: #fde047; color: #92400e; }
+        .badge-rusak { background: #fb923c; color: #7c2d12; }
+        .badge-rusak-parah { background: #f87171; color: #7f1d1d; }
+        .badge-hilang { background: #111827; color: #ffffff; }
         
+        .select-kondisi {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 10px 12px;
+            background: #fff;
+            color: #0f172a;
+            font-size: 13px;
+            min-width: 160px;
+            max-width: 220px;
+            cursor: pointer;
+        }
+        .select-baik { background: #dcfce7; color: #15803d; }
+        .select-cukup-baik { background: #fde047; color: #92400e; }
+        .select-rusak { background: #fb923c; color: #7c2d12; }
+        .select-rusak-parah { background: #f87171; color: #7f1d1d; }
+        .select-hilang { background: #111827; color: #ffffff; }
         .table-container {
             background: #fff;
             border-radius: 12px;
@@ -302,12 +342,11 @@ $q_list = mysqli_query($koneksi, $sql_list);
                     <thead>
                         <tr>
                             <th style="width: 50px;">NO</th>
-                            <th style="width: 120px;">KODE</th>
+                            <th style="width: 160px;">BARCODE</th>
                             <th>NAMA BARANG</th>
                             <th>KATEGORI</th>
                             <th>KONDISI</th>
-                            <th>JUMLAH</th>
-                            <th style="width: 140px;">AKSI</th>
+                            <th>KETERANGAN</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -315,34 +354,49 @@ $q_list = mysqli_query($koneksi, $sql_list);
                         if (mysqli_num_rows($q_list) > 0) {
                             $no = 1;
                             while ($row = mysqli_fetch_assoc($q_list)) { 
-                                $kondisi = $row['kondisi_utama'] ?? 'Baik';
-                                $badgeClass = ($kondisi == 'Baik') ? 'badge-baik' : 'badge-rusak';
+                                $kondisiRaw = $row['kondisi'] ?? 'baik';
+                                $kondisiLower = strtolower(trim(preg_replace('/\s+/', ' ', $kondisiRaw)));
+                                $badgeClass = 'badge-baik';
+                                if ($kondisiLower === 'cukup baik') {
+                                    $badgeClass = 'badge-cukup-baik';
+                                } elseif ($kondisiLower === 'rusak') {
+                                    $badgeClass = 'badge-rusak';
+                                } elseif ($kondisiLower === 'rusak parah') {
+                                    $badgeClass = 'badge-rusak-parah';
+                                } elseif ($kondisiLower === 'hilang') {
+                                    $badgeClass = 'badge-hilang';
+                                }
+                                $displayKondisi = ucwords($kondisiLower);
                         ?>
                             <tr>
                                 <td><?= $no++; ?></td>
-                                <td style="font-weight: 700; color: #0f172a;"><?= htmlspecialchars($row['kode_barang']); ?></td>
+                                <td style="font-weight: 700; color: #0f172a;"><?= htmlspecialchars($row['barcode']); ?></td>
                                 <td>
                                     <strong><?= htmlspecialchars($row['nama_barang']); ?></strong>
                                     <div style="font-size: 12px; color: #94a3b8;"><?= htmlspecialchars($row['deskripsi']); ?></div>
                                 </td>
                                 <td><?= htmlspecialchars($row['nama_kategori'] ?? '-'); ?></td>
                                 <td>
-                                    <span class="badge-kondisi <?= $badgeClass; ?>">
-                                        <?= htmlspecialchars($kondisi); ?>
-                                    </span>
+                                    <form method="POST" action="ruangan.php?id=<?= $id_ruangan; ?>">
+                                        <input type="hidden" name="id_inventaris" value="<?= $row['id_inventaris']; ?>">
+                                        <select name="kondisi" class="select-kondisi select-<?= str_replace(' ', '-', $kondisiLower); ?>" onchange="saveCondition(this)">
+                                            <option value="baik" <?= $kondisiLower === 'baik' ? 'selected' : ''; ?>>Baik</option>
+                                            <option value="cukup baik" <?= $kondisiLower === 'cukup baik' ? 'selected' : ''; ?>>Cukup Baik</option>
+                                            <option value="rusak" <?= $kondisiLower === 'rusak' ? 'selected' : ''; ?>>Rusak</option>
+                                            <option value="rusak parah" <?= $kondisiLower === 'rusak parah' ? 'selected' : ''; ?>>Rusak Parah</option>
+                                            <option value="hilang" <?= $kondisiLower === 'hilang' ? 'selected' : ''; ?>>Hilang</option>
+                                        </select>
+                                        <input type="hidden" name="update_kondisi" value="1">
+                                    </form>
                                 </td>
-                                <td><strong><?= $row['jumlah_unit']; ?></strong> <?= htmlspecialchars($row['satuan']); ?></td>
-                                <td>
-                                    <a href="edit_barang.php?id=<?= $row['id_inventaris']; ?>" class="btn-action btn-edit">Edit</a>
-                                    <a href="hapus_barang.php?id=<?= $row['id_inventaris']; ?>" class="btn-action btn-hapus" onclick="return confirm('Apakah Anda yakin ingin menghapus barang ini?')">Hapus</a>
-                                </td>
+                                <td><?= htmlspecialchars($row['keterangan_inventaris'] ?? '-'); ?></td>
                             </tr>
                         <?php 
                             }
                         } else { 
                         ?>
                             <tr>
-                                <td colspan="7" style="text-align: center; padding: 30px; color: #94a3b8;">
+                                <td colspan="6" style="text-align: center; padding: 30px; color: #94a3b8;">
                                     Belum ada data barang di ruangan ini.
                                 </td>
                             </tr>
@@ -354,6 +408,50 @@ $q_list = mysqli_query($koneksi, $sql_list);
         </div>
     </main>
 
+    <script>
+        function toggleEditMode(formId, hideOnly = false) {
+            var form = document.getElementById(formId);
+            if (!form) return;
+
+            if (hideOnly) {
+                form.classList.remove('active');
+                return;
+            }
+
+            var isActive = form.classList.contains('active');
+            form.classList.toggle('active', !isActive);
+        }
+
+        function saveCondition(select) {
+            var form = select.form;
+            if (!form) return;
+
+            var formData = new FormData(form);
+            fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            })
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error('Gagal menyimpan kondisi.');
+                }
+                return response.json();
+            })
+            .then(function(data) {
+                if (!data.success) {
+                    throw new Error(data.message || 'Gagal menyimpan kondisi.');
+                }
+                var value = select.value.toLowerCase().replace(/\s+/g, '-');
+                select.className = 'select-kondisi select-' + value;
+            })
+            .catch(function(error) {
+                alert(error.message);
+            });
+        }
+    </script>
 </body>
 
 </html>
