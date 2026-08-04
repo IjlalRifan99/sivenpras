@@ -134,6 +134,7 @@ $sql_list = "
         i.barcode,
         i.kondisi,
         i.keterangan AS keterangan_inventaris,
+        i.update_at,
         b.nama_barang,
         b.kode_barang,
         b.deskripsi,
@@ -167,6 +168,7 @@ $q_list = mysqli_query($koneksi, $sql_list);
     <title>SIVENPRAS - Ruangan <?= htmlspecialchars($d_ruangan['nama_ruangan']); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         .card-stats-grid {
             display: grid;
@@ -210,6 +212,29 @@ $q_list = mysqli_query($koneksi, $sql_list);
         .select-rusak { background: #fb923c; color: #7c2d12; }
         .select-rusak-parah { background: #f87171; color: #7f1d1d; }
         .select-hilang { background: #111827; color: #ffffff; }
+
+        .selected-actions {
+            display: none;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-action {
+            border: none;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-action.btn-print {
+            background: #0f172a;
+            color: #ffffff;
+        }
+        .btn-action.btn-delete {
+            background: #dc2626;
+            color: #ffffff;
+        }
 
         .table-container {
             background: #fff;
@@ -325,6 +350,25 @@ $q_list = mysqli_query($koneksi, $sql_list);
             font-size: 14px;
             color: #334155;
             vertical-align: middle;
+        }
+        .qr-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+        .qr-code {
+            width: 64px;
+            height: 64px;
+            min-width: 64px;
+            min-height: 64px;
+        }
+        .barcode-label {
+            font-size: 12px;
+            color: #475569;
+            font-weight: 600;
+            word-break: break-all;
+            text-align: center;
         }
     </style>
 </head>
@@ -466,13 +510,6 @@ $q_list = mysqli_query($koneksi, $sql_list);
                         <span style="font-size: 13px; color: #64748b;">
                             Menampilkan <strong><?= mysqli_num_rows($q_list); ?></strong> barang
                         </span>
-
-                        <button type="submit" 
-                                id="btnHapusMassal" 
-                                onclick="return confirm('Apakah Anda yakin ingin menghapus barang yang dicentang?')" 
-                                style="display: none; background: #dc2626; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; align-items: center; gap: 6px;">
-                            <i class="ph ph-trash"></i> Hapus yang Dipilih (<span id="jumlahTerpilih">0</span>)
-                        </button>
                     </div>
 
                     <table>
@@ -486,6 +523,8 @@ $q_list = mysqli_query($koneksi, $sql_list);
                                 <th>KATEGORI</th>
                                 <th style="width: 200px;">KETERANGAN</th>
                                 <th style="width: 170px;">KONDISI</th>
+                                <th style="width: 180px;">TERAKHIR DIUPDATE</th>
+                                <th style="width: 220px;">QR CODE</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -498,7 +537,7 @@ $q_list = mysqli_query($koneksi, $sql_list);
                             ?>
                                 <tr>
                                     <td style="text-align: center;">
-                                        <input type="checkbox" name="ids_inventaris[]" value="<?= $row['id_inventaris']; ?>" class="item-checkbox" onchange="updateBatchDeleteButton()">
+                                        <input type="checkbox" name="ids_inventaris[]" value="<?= $row['id_inventaris']; ?>" class="item-checkbox" data-barcode="<?= htmlspecialchars($row['barcode']); ?>" onchange="updateBatchDeleteButton()">
                                     </td>
                                     <td style="font-weight: 700; color: #0f172a;"><?= htmlspecialchars($row['barcode']); ?></td>
                                     <td>
@@ -523,6 +562,11 @@ $q_list = mysqli_query($koneksi, $sql_list);
                                             <option value="hilang" <?= $kondisiLower === 'hilang' ? 'selected' : ''; ?>>Hilang</option>
                                         </select>
                                     </td>
+                                    <td><?= htmlspecialchars(date('d M Y H:i', strtotime($row['update_at'] ?? $row['created_at']))); ?></td>
+                                    <td class="qr-cell">
+                                        <div class="qr-code" data-barcode="<?= htmlspecialchars($row['barcode']); ?>"></div>
+                                        <div class="barcode-label"><?= htmlspecialchars($row['barcode']); ?></div>
+                                    </td>
                                 </tr>
                             <?php 
                                 }
@@ -536,6 +580,14 @@ $q_list = mysqli_query($koneksi, $sql_list);
                             <?php } ?>
                         </tbody>
                     </table>
+
+                    <div id="selectedActions" class="selected-actions" style="display: none; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 18px;">
+                        <span id="selectedCountText" style="font-size: 13px; color: #475569;">0 item terpilih</span>
+                        <button type="button" class="btn-action btn-print" onclick="printSelectedItems()">Print</button>
+                        <button type="submit" id="btnHapusMassal" onclick="return confirm('Apakah Anda yakin ingin menghapus barang yang dicentang?')" class="btn-action btn-delete">
+                            <i class="ph ph-trash"></i> Hapus
+                        </button>
+                    </div>
                 </form>
             </div>
 
@@ -565,17 +617,6 @@ $q_list = mysqli_query($koneksi, $sql_list);
                 input.form.submit();
             }, 500);
         }
-
-        // Kursor tetap fokus di input search setelah reload
-        document.addEventListener("DOMContentLoaded", function() {
-            var searchInput = document.getElementById('searchInput');
-            if (searchInput && searchInput.value !== '') {
-                searchInput.focus();
-                var val = searchInput.value;
-                searchInput.value = '';
-                searchInput.value = val;
-            }
-        });
 
         // 3. Save Kondisi Inline via AJAX
         function saveConditionInline(id_inventaris, selectElement) {
@@ -645,22 +686,141 @@ $q_list = mysqli_query($koneksi, $sql_list);
 
         function updateBatchDeleteButton() {
             var checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
-            var btnHapus = document.getElementById('btnHapusMassal');
-            var jumlahSpan = document.getElementById('jumlahTerpilih');
+            var actionBar = document.getElementById('selectedActions');
+            var selectedCountText = document.getElementById('selectedCountText');
             var checkAll = document.getElementById('checkAll');
             var totalBoxes = document.querySelectorAll('.item-checkbox');
 
             if (checkedBoxes.length > 0) {
-                btnHapus.style.display = 'inline-flex';
-                jumlahSpan.textContent = checkedBoxes.length;
+                actionBar.style.display = 'flex';
+                selectedCountText.textContent = checkedBoxes.length + ' item terpilih';
             } else {
-                btnHapus.style.display = 'none';
+                actionBar.style.display = 'none';
             }
 
             if (totalBoxes.length > 0) {
                 checkAll.checked = (checkedBoxes.length === totalBoxes.length);
             }
         }
+
+        function getSelectedItems() {
+            return Array.from(document.querySelectorAll('.item-checkbox:checked')).map(function(cb) {
+                var row = cb.closest('tr');
+                return {
+                    barcode: cb.dataset.barcode || '',
+                    name: row ? (row.querySelector('td:nth-child(3) strong') || {}).textContent || '' : ''
+                };
+            });
+        }
+
+        function getQrDataUrl(code) {
+            var tempContainer = document.createElement('div');
+            tempContainer.style.position = 'absolute';
+            tempContainer.style.left = '-9999px';
+            tempContainer.style.visibility = 'hidden';
+            document.body.appendChild(tempContainer);
+
+            new QRCode(tempContainer, {
+                text: code,
+                width: 120,
+                height: 120,
+                colorDark: '#0f172a',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H,
+                render: 'canvas'
+            });
+
+            var canvas = tempContainer.querySelector('canvas');
+            var dataUrl = canvas ? canvas.toDataURL('image/png') : '';
+            document.body.removeChild(tempContainer);
+            return dataUrl;
+        }
+
+        function printSelectedItems() {
+            var items = getSelectedItems();
+            if (items.length === 0) {
+                alert('Pilih minimal satu barang untuk dicetak.');
+                return;
+            }
+
+            var itemHtml = items.map(function(item, index) {
+                var imageData = getQrDataUrl(item.barcode);
+                return {
+                    barcode: item.barcode,
+                    name: item.name,
+                    imageData: imageData
+                };
+            });
+
+            var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+                + '<head><meta charset="utf-8"><title>Barcode Export</title>'
+                + '<style>body{font-family:Arial,sans-serif;margin:24px;}table{width:100%;border-collapse:collapse;table-layout:fixed;}td{width:33.33%;padding:4px;vertical-align:top;text-align:center;} .barcode-card{width:100%;padding-bottom:100%;position:relative;box-sizing:border-box;border:1px dotted #64748b;overflow:hidden;margin:0 auto;} .barcode-card-inner{position:absolute;top:10px;left:10px;right:10px;bottom:10px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;} img{width:130px;height:130px;} .barcode-label{font-size:12px;color:#334155;word-break:break-word;} .cut-line{position:absolute;bottom:8px;left:8px;right:8px;height:0;border:none;border-bottom:1px dotted #64748b;}</style></head><body>'
+                + '<table>';
+
+            itemHtml.forEach(function(item, idx) {
+                if (idx % 3 === 0) {
+                    html += '<tr>';
+                }
+                html += '<td>';
+                html += '<div class="barcode-card">';
+                html += '<div class="barcode-card-inner">';
+                html += '<img src="' + item.imageData + '" alt="QR Code" />';
+                html += '<div class="barcode-label">' + item.barcode + '</div>';
+                html += '<div class="cut-line"></div>';
+                html += '</div>';
+                html += '</div>';
+                html += '</td>';
+                if (idx % 3 === 2) {
+                    html += '</tr>';
+                }
+            });
+
+            if (itemHtml.length % 3 !== 0) {
+                for (var fill = itemHtml.length % 3; fill < 3; fill++) {
+                    html += '<td></td>';
+                }
+                html += '</tr>';
+            }
+
+            html += '</table></body></html>';
+
+            var blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = 'export-barcode.doc';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        function renderBarcodeCells() {
+            document.querySelectorAll('.qr-code').forEach(function(container) {
+                var code = container.dataset.barcode || '';
+                if (code && container.children.length === 0) {
+                    new QRCode(container, {
+                        text: code,
+                        width: 64,
+                        height: 64,
+                        colorDark: '#0f172a',
+                        colorLight: '#ffffff',
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            renderBarcodeCells();
+            var searchInput = document.getElementById('searchInput');
+            if (searchInput && searchInput.value !== '') {
+                searchInput.focus();
+                var val = searchInput.value;
+                searchInput.value = '';
+                searchInput.value = val;
+            }
+        });
     </script>
 </body>
 
