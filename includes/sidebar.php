@@ -34,6 +34,12 @@ $q_ruangan = mysqli_query($koneksi, "SELECT r.id_ruangan, r.nama_ruangan, COUNT(
             </div>
         </a>
 
+        <a href="scan-barcode.php" class="menu-item <?= ($active_page ?? '') == 'scan-barcode' ? 'active' : ''; ?>">
+            <div class="menu-left">
+                <i class="bi bi-upc-scan menu-icon"></i> Scan Barcode
+            </div>
+        </a>
+
         <a href="laporan.php" class="menu-item <?= ($active_page ?? '') == 'laporan' ? 'active' : ''; ?>">
             <div class="menu-left">
                 <i class="bi bi-bar-chart-line-fill menu-icon"></i> Laporan
