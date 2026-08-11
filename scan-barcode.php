@@ -75,74 +75,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_scanned_item']
 include 'includes/header.php';
 ?>
 
-<div class="dashboard-container" style="padding: 24px;">
-    <h1 style="font-size: 28px; color: #0f172a; font-weight: 700; margin-bottom: 20px;">Scan Barcode</h1>
+<div class="dashboard-container scan-page-shell" style="padding: 24px;">
+    <h1 class="scan-page-title">Scan Barcode</h1>
 
-    <div style="display: grid; grid-template-columns: 1.1fr 1.3fr; gap: 24px; align-items: start;">
-        <div class="widget-card" style="padding: 20px;">
-            <h3 style="margin-bottom: 18px; color: #0f172a;">Scanner</h3>
+    <div class="scan-layout">
+        <div class="widget-card scan-panel">
+            <h3 class="scan-panel-title">Scanner</h3>
 
-            <form method="POST" action="scan-barcode.php" id="scanForm">
-                <input type="text" name="barcode" id="barcodeInput" class="search-box-input" placeholder="Cari Kode Barang Manual" style="width: 100%; margin-bottom: 12px;" autocomplete="off" autofocus>
-                <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Cari Barang</button>
+            <form method="POST" action="scan-barcode.php" id="scanForm" class="scan-form">
+                <input type="text" name="barcode" id="barcodeInput" class="search-box-input scan-manual-input" placeholder="Cari Kode Barang Manual" autocomplete="off" autofocus>
+                <button type="submit" class="btn-primary scan-submit-btn">Cari Barang</button>
             </form>
 
-            <div id="scannerBox" style="margin-top: 18px; border: 1px solid #cbd5e1; border-radius: 12px; min-height: 260px; background: linear-gradient(135deg, #f8fafc, #e2e8f0); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
-                <video id="cameraPreview" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; display: none; background: #0f172a;"></video>
-                <div id="cameraFallback" style="text-align: center; color: #475569; padding: 20px; display: none;">
-                    <i class="bi bi-camera-video" style="font-size: 40px; display: block; margin-bottom: 8px;"></i>
+            <div id="scannerBox" class="scanner-box">
+                <video id="cameraPreview" autoplay playsinline muted class="camera-preview"></video>
+                <div id="cameraFallback" class="camera-fallback">
+                    <i class="bi bi-camera-video camera-fallback-icon"></i>
                 </div>
             </div>
 
-            <div style="margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
-                <button type="button" id="startCamera" class="btn-primary" style="background: #0f766e;">Aktifkan Kamera</button>
-                <button type="button" id="stopCamera" class="btn-primary" style="background: #64748b; display: none;">Matikan Kamera</button>
+            <div class="scan-control-row">
+                <button type="button" id="startCamera" class="btn-primary scan-camera-btn scan-camera-start">Aktifkan Kamera</button>
+                <button type="button" id="stopCamera" class="btn-primary scan-camera-btn scan-camera-stop">Matikan Kamera</button>
             </div>
 
             <?php if (!empty($scan_error)): ?>
-                <div class="alert-error" style="margin-top: 16px; padding: 10px 14px; border-radius: 8px; background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b;">
+                <div class="alert-error scan-alert">
                     <?= htmlspecialchars($scan_error); ?>
                 </div>
             <?php endif; ?>
         </div>
 
-        <div class="widget-card" style="padding: 20px; min-height: 420px;">
+        <div class="widget-card scan-result-panel">
             <?php if ($scan_result): ?>
-                <h3 style="margin-bottom: 18px; color: #0f172a;">Hasil Scan</h3>
+                <h3 class="scan-result-title">Hasil Scan</h3>
 
                 <form method="POST" action="scan-barcode.php">
                     <input type="hidden" name="update_scanned_item" value="1">
                     <input type="hidden" name="id_inventaris" value="<?= (int) $scan_result['id_inventaris']; ?>">
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px;">
+                    <div class="scan-detail-grid">
                         <div>
-                            <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase;">Kode Barang</label>
+                            <label class="scan-field-label">Kode Barang</label>
                             <input type="text" class="search-box-input" value="<?= htmlspecialchars($scan_result['kode_barang'] ?? ''); ?>" readonly>
                         </div>
 
                         <div>
-                            <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase;">Barcode</label>
+                            <label class="scan-field-label">Barcode</label>
                             <input type="text" class="search-box-input" value="<?= htmlspecialchars($scan_result['barcode'] ?? ''); ?>" readonly>
                         </div>
 
                         <div>
-                            <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase;">Nama Barang</label>
+                            <label class="scan-field-label">Nama Barang</label>
                             <input type="text" class="search-box-input" value="<?= htmlspecialchars($scan_result['nama_barang'] ?? ''); ?>" readonly>
                         </div>
 
                         <div>
-                            <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase;">Kategori</label>
+                            <label class="scan-field-label">Kategori</label>
                             <input type="text" class="search-box-input" value="<?= htmlspecialchars($scan_result['nama_kategori'] ?? '-'); ?>" readonly>
                         </div>
 
-                        <div style="grid-column: 1 / -1;">
-                            <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase;">Keterangan</label>
+                        <div class="scan-field-full">
+                            <label class="scan-field-label">Keterangan</label>
                             <input type="text" name="keterangan" class="search-box-input" value="<?= htmlspecialchars($scan_result['keterangan'] ?? ''); ?>">
                         </div>
 
                         <div>
-                            <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase;">Kondisi</label>
-                            <select name="kondisi" class="filter-select" style="width: 100%;">
+                            <label class="scan-field-label">Kondisi</label>
+                            <select name="kondisi" class="filter-select scan-select">
                                 <option value="baik" <?= strtolower((string)($scan_result['kondisi'] ?? '')) === 'baik' ? 'selected' : ''; ?>>Baik</option>
                                 <option value="cukup baik" <?= strtolower((string)($scan_result['kondisi'] ?? '')) === 'cukup baik' ? 'selected' : ''; ?>>Cukup Baik</option>
                                 <option value="rusak" <?= strtolower((string)($scan_result['kondisi'] ?? '')) === 'rusak' ? 'selected' : ''; ?>>Rusak</option>
@@ -152,30 +152,248 @@ include 'includes/header.php';
                         </div>
 
                         <div>
-                            <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase;">Ruangan</label>
+                            <label class="scan-field-label">Ruangan</label>
                             <input type="text" class="search-box-input" value="<?= htmlspecialchars($scan_result['nama_ruangan'] ?? '-'); ?>" readonly>
                         </div>
                     </div>
 
-                    <div style="margin-top: 22px;">
-                        <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase;">QR CODE</label>
-                        <div style="display:flex; justify-content:center; align-items:center; border:1px solid #dbe4ee; border-radius:12px; background:#fff; min-height:180px; padding:20px;">
+                    <div class="scan-qr-wrap">
+                        <label class="scan-field-label">QR CODE</label>
+                        <div class="scan-qr-box">
                             <div class="qr-code" data-barcode="<?= htmlspecialchars($scan_result['barcode'] ?? ''); ?>" style="width:120px; height:120px;"></div>
                         </div>
                     </div>
 
-                    <div style="margin-top: 20px; display: flex; gap: 12px; justify-content: flex-end;">
+                    <div class="scan-save-row">
                         <button type="submit" class="btn-primary">Simpan Perubahan</button>
                     </div>
                 </form>
             <?php else: ?>
-                <div style="display: flex; align-items: center; justify-content: center; min-height: 320px; color: #64748b; text-align: center;">
+                <div class="scan-empty-state">
                     Belum ada data yang dipindai. Silakan scan atau masukkan barcode.
                 </div>
             <?php endif; ?>
         </div>
     </div>
 </div>
+
+<style>
+    .scan-page-shell {
+        box-sizing: border-box;
+    }
+
+    .scan-page-title {
+        font-size: 28px;
+        color: #0f172a;
+        font-weight: 700;
+        margin-bottom: 20px;
+    }
+
+    .scan-layout {
+        display: grid;
+        grid-template-columns: 1.1fr 1.3fr;
+        gap: 24px;
+        align-items: start;
+    }
+
+    .scan-panel,
+    .scan-result-panel {
+        padding: 20px;
+    }
+
+    .scan-panel-title,
+    .scan-result-title {
+        margin-bottom: 18px;
+        color: #0f172a;
+    }
+
+    .scan-form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .scan-manual-input {
+        width: 100%;
+        margin-bottom: 0 !important;
+        box-sizing: border-box;
+    }
+
+    .scan-submit-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .scanner-box {
+        margin-top: 18px;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        min-height: 260px;
+        height: 320px;
+        background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .camera-preview {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: none;
+        background: #0f172a;
+    }
+
+    .camera-fallback {
+        text-align: center;
+        color: #475569;
+        padding: 20px;
+        display: none;
+    }
+
+    .camera-fallback-icon {
+        font-size: 40px;
+        display: block;
+        margin-bottom: 8px;
+    }
+
+    .scan-control-row {
+        margin-top: 14px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .scan-camera-btn {
+        flex: 1 1 180px;
+        justify-content: center;
+    }
+
+    .scan-camera-start {
+        background: #0f766e;
+    }
+
+    .scan-camera-stop {
+        background: #64748b;
+        display: none;
+    }
+
+    .scan-alert {
+        margin-top: 16px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        background: #fee2e2;
+        border: 1px solid #fca5a5;
+        color: #991b1b;
+    }
+
+    .scan-detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+    }
+
+    .scan-field-label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+    }
+
+    .scan-field-full {
+        grid-column: 1 / -1;
+    }
+
+    .scan-select {
+        width: 100%;
+    }
+
+    .scan-qr-wrap {
+        margin-top: 22px;
+    }
+
+    .scan-qr-box {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border: 1px solid #dbe4ee;
+        border-radius: 12px;
+        background: #fff;
+        min-height: 180px;
+        padding: 20px;
+    }
+
+    .scan-save-row {
+        margin-top: 20px;
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+    }
+
+    .scan-empty-state {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 320px;
+        color: #64748b;
+        text-align: center;
+        padding: 20px;
+    }
+
+    @media (max-width: 767px) {
+        .dashboard-container {
+            padding: 16px !important;
+        }
+
+        .scan-page-title {
+            font-size: 24px;
+            margin-bottom: 16px;
+        }
+
+        .scan-layout {
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .scan-panel,
+        .scan-result-panel {
+            padding: 16px;
+        }
+
+        .scanner-box {
+            min-height: 220px;
+            height: 240px;
+        }
+
+        .scan-control-row {
+            flex-direction: column;
+        }
+
+        .scan-camera-btn,
+        .scan-submit-btn {
+            width: 100%;
+            flex: 1 1 100%;
+        }
+
+        .scan-detail-grid {
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+
+        .scan-save-row {
+            justify-content: stretch;
+        }
+
+        .scan-save-row .btn-primary {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
 
 <script>
     const video = document.getElementById('cameraPreview');
