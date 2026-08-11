@@ -477,9 +477,22 @@ include 'includes/header.php';
         detectionLoop = requestAnimationFrame(startDetectionLoop);
     }
 
+    function showCameraMessage(message) {
+        cameraFallback.style.display = 'block';
+        cameraFallback.innerHTML = '<div style="color:#0f172a; font-weight:600; line-height:1.6;">' + message + '</div>';
+        video.style.display = 'none';
+        startCameraBtn.style.display = 'inline-flex';
+        stopCameraBtn.style.display = 'none';
+    }
+
     async function startCamera() {
+        if (!window.isSecureContext) {
+            showCameraMessage('Untuk scan barcode dari handphone via IP, gunakan koneksi HTTPS atau buka dari localhost. Kamera tidak bisa aktif di origin tidak aman.');
+            return;
+        }
+
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            cameraFallback.innerHTML = '<div style="color:#b91c1c;">Browser ini tidak mendukung kamera.</div>';
+            showCameraMessage('Browser ini tidak mendukung akses kamera untuk scan barcode.');
             return;
         }
 
@@ -489,20 +502,27 @@ include 'includes/header.php';
 
         try {
             stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' }
+                video: {
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
             });
 
             video.srcObject = stream;
             video.style.display = 'block';
             cameraFallback.style.display = 'none';
+            cameraFallback.innerHTML = '';
             startCameraBtn.style.display = 'none';
             stopCameraBtn.style.display = 'inline-flex';
             cameraStarted = true;
             await video.play();
             detectionLoop = requestAnimationFrame(startDetectionLoop);
         } catch (error) {
-            cameraFallback.innerHTML = '';
-            cameraFallback.style.display = 'none';
+            const message = (error && error.name === 'NotAllowedError')
+                ? 'Izin kamera ditolak. Izinkan akses kamera di browser lalu coba lagi.'
+                : 'Kamera tidak bisa diakses di perangkat ini. Anda tetap bisa memasukkan barcode secara manual.';
+            showCameraMessage(message);
         }
     }
 
