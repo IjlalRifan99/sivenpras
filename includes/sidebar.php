@@ -5,7 +5,7 @@ $q_ruangan = mysqli_query($koneksi, "SELECT r.id_ruangan, r.nama_ruangan, COUNT(
 <aside class="sidebar">
     <div class="sidebar-brand">
         <div class="brand-icon">
-            <i class="ph-bold ph-archive-box"></i>
+            <img src="assets/img/logotb.png" alt="SIVENPRAS-TB Logo" class="brand-logo">
         </div>
         <div class="brand-text">
             <h2>SIVENPRAS-TB</h2>
