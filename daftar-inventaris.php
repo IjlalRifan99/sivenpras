@@ -73,6 +73,7 @@ $detail_query = "
         k.nama_kategori,
         i.barcode,
         i.kondisi,
+        i.keterangan,
         r.nama_ruangan
     FROM inventaris i
     JOIN barang b ON i.barang_id = b.id_barang
@@ -215,6 +216,18 @@ if ($q_detail_units) {
             <button type="button" onclick="closeModal()" class="btn-close-icon">&times;</button>
         </div>
 
+        <div class="modal-filter-row">
+            <label for="modalKondisiFilter">Filter Kondisi</label>
+            <select id="modalKondisiFilter" class="filter-select">
+                <option value="">Semua Kondisi</option>
+                <option value="baik">Baik</option>
+                <option value="cukup baik">Cukup Baik</option>
+                <option value="rusak">Rusak</option>
+                <option value="rusak parah">Rusak Parah</option>
+                <option value="hilang">Hilang</option>
+            </select>
+        </div>
+
         <div class="modal-body-scroll">
             <table class="modal-table">
                 <thead>
@@ -224,6 +237,7 @@ if ($q_detail_units) {
                         <th>NAMA BARANG</th>
                         <th>RUANGAN</th>
                         <th>KONDISI</th>
+                        <th>KETERANGAN</th>
                     </tr>
                 </thead>
                 <tbody id="modalBody">
@@ -418,6 +432,20 @@ if ($q_detail_units) {
         flex: 1;
     }
 
+    .modal-filter-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .modal-filter-row label {
+        font-size: 13px;
+        color: #475569;
+        font-weight: 600;
+        min-width: 110px;
+    }
+
     .modal-table {
         width: 100%;
         border-collapse: collapse;
@@ -471,13 +499,72 @@ if ($q_detail_units) {
             .replace(/'/g, '&#39;');
     }
 
+    function getFilterLabel(filter) {
+        switch ((filter || '').toLowerCase().trim()) {
+            case 'baik':
+                return 'Total Baik';
+            case 'cukup baik':
+                return 'Total Cukup Baik';
+            case 'rusak':
+                return 'Total Rusak';
+            case 'rusak parah':
+                return 'Total Rusak Parah';
+            case 'hilang':
+                return 'Total Hilang';
+            default:
+                return 'Total';
+        }
+    }
+
+    function renderModalRows(units, kondisiFilter, barangNama, barangKode) {
+        const body = document.getElementById('modalBody');
+        const subtitle = document.getElementById('modalSubtitle');
+        const filter = (kondisiFilter || '').toLowerCase().trim();
+        const filtered = units.filter(function (unit) {
+            if (!filter) return true;
+            return String(unit.kondisi || '').toLowerCase().trim() === filter;
+        });
+
+        if (filtered.length > 0) {
+            body.innerHTML = filtered.map(function (unit, index) {
+                return `
+                <tr>
+                    <td style="color: #64748b;">${index + 1}</td>
+                    <td style="font-weight: 600; color: #0f172a;">${escapeHtml(unit.barcode || '-')}</td>
+                    <td style="color: #1e293b; font-weight: 500;">${escapeHtml(unit.nama_barang || barangNama || '-')}</td>
+                    <td style="color: #334155;">${escapeHtml(unit.nama_ruangan || '-')}</td>
+                    <td style="text-transform: capitalize;">${escapeHtml(unit.kondisi || '-')}</td>
+                    <td style="color: #475569;">${escapeHtml(unit.keterangan || '-')}</td>
+                </tr>
+            `;
+            }).join('');
+        } else {
+            body.innerHTML = `
+            <tr>
+                <td colspan="6" style="padding: 20px; text-align: center; color: #94a3b8;">
+                    Tidak ada unit dengan kondisi terpilih.
+                </td>
+            </tr>
+        `;
+        }
+
+        if (subtitle) {
+            subtitle.textContent = `Kode: ${barangKode} | ${getFilterLabel(filter)}: ${filtered.length} unit`;
+        }
+    }
+
     function openModal(barangId, barangNama, barangKode) {
         const modal = document.getElementById('simpleModal');
         const title = document.getElementById('modalTitle');
         const namaBarangEl = document.getElementById('modalNamaBarang');
-        const subtitle = document.getElementById('modalSubtitle');
-        const body = document.getElementById('modalBody');
+        const kondisiFilterEl = document.getElementById('modalKondisiFilter');
         const units = detailUnits[barangId] || [];
+
+        // Simpan barangId dan barangKode pada modal untuk filter
+        if (modal) {
+            modal.dataset.barangId = barangId;
+            modal.dataset.barangKode = barangKode;
+        }
 
         // Set Judul Modal
         title.textContent = 'Detail Unit Barang';
@@ -487,31 +574,11 @@ if ($q_detail_units) {
             namaBarangEl.textContent = barangNama || '-';
         }
 
-        // Set Subtitle Modal
-        subtitle.textContent = 'Kode: ' + barangKode + ' | Total: ' + units.length + ' unit';
-
-        // Render Baris Tabel Modal
-        if (units.length > 0) {
-            body.innerHTML = units.map(function (unit, index) {
-                return `
-                <tr>
-                    <td style="color: #64748b;">${index + 1}</td>
-                    <td style="font-weight: 600; color: #0f172a;">${escapeHtml(unit.barcode || '-')}</td>
-                    <td style="color: #1e293b; font-weight: 500;">${escapeHtml(unit.nama_barang || barangNama || '-')}</td>
-                    <td style="color: #334155;">${escapeHtml(unit.nama_ruangan || '-')}</td>
-                    <td style="text-transform: capitalize;">${escapeHtml(unit.kondisi || '-')}</td>
-                </tr>
-            `;
-            }).join('');
-        } else {
-            body.innerHTML = `
-            <tr>
-                <td colspan="5" style="padding: 20px; text-align: center; color: #94a3b8;">
-                    Tidak ada unit inventaris terdaftar untuk barang ini.
-                </td>
-            </tr>
-        `;
+        if (kondisiFilterEl) {
+            kondisiFilterEl.value = '';
         }
+
+        renderModalRows(units, '', barangNama, barangKode);
 
         modal.classList.add('show');
     }
@@ -520,11 +587,13 @@ if ($q_detail_units) {
         const modal = document.getElementById('simpleModal');
         if (modal) {
             modal.classList.remove('show');
+            delete modal.dataset.barangId;
         }
     }
 
     document.addEventListener('DOMContentLoaded', function () {
         const buttons = document.querySelectorAll('.btn-view-units');
+        const kondisiFilterEl = document.getElementById('modalKondisiFilter');
 
         buttons.forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -535,6 +604,19 @@ if ($q_detail_units) {
                 openModal(barangId, barangNama, barangKode);
             });
         });
+
+        if (kondisiFilterEl) {
+            kondisiFilterEl.addEventListener('change', function () {
+                const modal = document.getElementById('simpleModal');
+                if (!modal.classList.contains('show')) return;
+
+                const barangId = modal.dataset.barangId;
+                const barangKode = modal.dataset.barangKode || '';
+                const barangNama = document.getElementById('modalNamaBarang').textContent;
+                const units = detailUnits[barangId] || [];
+                renderModalRows(units, this.value, barangNama, barangKode);
+            });
+        }
 
         const modal = document.getElementById('simpleModal');
         window.addEventListener('click', function (e) {
