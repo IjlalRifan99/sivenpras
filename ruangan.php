@@ -1,5 +1,13 @@
 <?php
+session_start();
 include 'config/koneksi.php';
+
+if (!isset($_SESSION['login'])) {
+    header("Location: login.php");
+    exit;
+}
+
+$active_page = 'ruangan';
 
 // 1. Ambil ID Ruangan dari URL
 $id_ruangan = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -8,6 +16,20 @@ if ($id_ruangan == 0) {
     header("Location: index.php");
     exit;
 }
+
+$q_ruangan_detail = mysqli_query($koneksi, "SELECT * FROM ruangan WHERE id_ruangan = $id_ruangan");
+
+if (!$q_ruangan_detail || mysqli_num_rows($q_ruangan_detail) == 0) {
+    header("Location: index.php");
+    exit;
+}
+
+$ruangan = mysqli_fetch_assoc($q_ruangan_detail);
+$nama_ruangan = $ruangan['nama_ruangan'];
+
+$page_title = $nama_ruangan;
+$breadcrumb = "Ruangan > " . $nama_ruangan;
+$page_title = 'Ruangan';
 
 // Handler Update Kondisi via AJAX / POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_kondisi'], $_POST['id_inventaris'])) {
@@ -157,281 +179,11 @@ if (!empty($filter_kondisi)) {
 
 $sql_list .= " ORDER BY i.barcode ASC";
 $q_list = mysqli_query($koneksi, $sql_list);
+
 ?>
 
-<!DOCTYPE html>
-<html lang="id">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SIVENPRAS - Ruangan <?= htmlspecialchars($d_ruangan['nama_ruangan']); ?></title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <style>
-        .card-stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-        .stat-card {
-            background: #fff;
-            padding: 20px;
-            border-radius: 10px;
-            border: 1px solid #e2e8f0;
-        }
-        .stat-card p {
-            font-size: 13px;
-            color: #64748b;
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-        .stat-card h2 {
-            font-size: 28px;
-            font-weight: 700;
-            color: #0f172a;
-        }
-        .stat-card.good h2 { color: #16a34a; }
-        .stat-card.warning h2 { color: #dc2626; }
+<?php include 'includes/header.php'; ?>
         
-        .select-kondisi {
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            padding: 8px 10px;
-            background: #fff;
-            color: #0f172a;
-            font-size: 13px;
-            width: 100%;
-            min-width: 130px;
-            cursor: pointer;
-        }
-        .select-baik { background: #dcfce7; color: #15803d; }
-        .select-cukup-baik { background: #fde047; color: #92400e; }
-        .select-rusak { background: #fb923c; color: #7c2d12; }
-        .select-rusak-parah { background: #f87171; color: #7f1d1d; }
-        .select-hilang { background: #111827; color: #ffffff; }
-
-        .selected-actions {
-            display: none;
-            justify-content: flex-end;
-            align-items: center;
-            gap: 10px;
-        }
-        .btn-action {
-            border: none;
-            border-radius: 8px;
-            padding: 10px 14px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .btn-action.btn-print {
-            background: #0f172a;
-            color: #ffffff;
-        }
-        .btn-action.btn-delete {
-            background: #dc2626;
-            color: #ffffff;
-        }
-
-        .table-container {
-            background: #fff;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
-            padding: 20px;
-        }
-        
-        .filter-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            align-items: center;
-            margin-bottom: 20px;
-            background: #f8fafc;
-            padding: 16px;
-            border-radius: 10px;
-            border: 1px solid #e2e8f0;
-        }
-        .filter-item {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .filter-item label {
-            font-size: 11px;
-            font-weight: 600;
-            color: #64748b;
-            text-transform: uppercase;
-        }
-        .filter-select, .search-box-input {
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            padding: 8px 12px;
-            background: #fff;
-            font-size: 13px;
-            color: #0f172a;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        .btn-reset-filter {
-            background: #f1f5f9;
-            color: #475569;
-            padding: 8px 14px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 13px;
-            font-weight: 600;
-            margin-top: auto;
-            border: 1px solid #cbd5e1;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-reset-filter:hover { background: #e2e8f0; }
-
-        /* STYLE DROPDOWN SIDEBAR RUANGAN */
-        .sidebar-dropdown-btn {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            user-select: none;
-            margin-top: 24px;
-            padding: 8px 12px;
-            border-radius: 6px;
-            transition: background 0.2s;
-        }
-        .sidebar-dropdown-btn:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-        .sidebar-dropdown-container {
-            display: none;
-            flex-direction: column;
-            gap: 4px;
-            margin-top: 6px;
-            padding-left: 8px;
-            overflow: hidden;
-        }
-        .sidebar-dropdown-container.open {
-            display: flex;
-        }
-        .caret-icon {
-            transition: transform 0.3s ease;
-        }
-        .caret-icon.rotate {
-            transform: rotate(180deg);
-        }
-
-        /* Checkbox */
-        input[type="checkbox"] {
-            transform: scale(1.3);
-            cursor: pointer;
-            accent-color: #0d9488;
-            margin: 4px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th {
-            text-align: left;
-            padding: 12px;
-            font-size: 12px;
-            color: #64748b;
-            text-transform: uppercase;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        td {
-            padding: 12px;
-            border-bottom: 1px solid #f1f5f9;
-            font-size: 14px;
-            color: #334155;
-            vertical-align: middle;
-        }
-        .qr-cell {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-        }
-        .qr-code {
-            width: 64px;
-            height: 64px;
-            min-width: 64px;
-            min-height: 64px;
-        }
-        .barcode-label {
-            font-size: 12px;
-            color: #475569;
-            font-weight: 600;
-            word-break: break-all;
-            text-align: center;
-        }
-    </style>
-</head>
-
-<body>
-
-    <aside class="sidebar">
-        <div class="sidebar-brand">
-            <div class="brand-icon">
-                <i class="ph-bold ph-archive-box"></i>
-            </div>
-            <div class="brand-text">
-                <h2>SIVENPRAS</h2>
-                <p>Sistem Inventaris Sarpras</p>
-            </div>
-        </div>
-
-        <nav class="sidebar-menu">
-            <div class="menu-label">Menu Utama</div>
-            <a href="index.php" class="menu-item">
-                <div class="menu-left"><i class="ph ph-squares-four"></i> Dashboard</div>
-            </a>
-            <a href="daftar-inventaris.php" class="menu-item">
-                <div class="menu-left"><i class="ph ph-clipboard-text"></i> Daftar Inventaris</div>
-            </a>
-            <a href="tambah-barang.php" class="menu-item">
-                <div class="menu-left"><i class="ph ph-plus"></i> Tambah Barang</div>
-            </a>
-            <a href="laporan.php" class="menu-item">
-                <div class="menu-left"><i class="ph ph-chart-bar"></i> Laporan</div>
-            </a>
-
-            <div class="menu-label sidebar-dropdown-btn" onclick="toggleRuanganDropdown()">
-                <span>Ruangan</span>
-                <i class="ph ph-caret-down caret-icon" id="ruanganCaret"></i>
-            </div>
-
-            <div class="sidebar-dropdown-container open" id="ruanganDropdown">
-                <?php while ($r = mysqli_fetch_assoc($q_ruangan_sidebar)) { 
-                    $activeClass = ($r['id_ruangan'] == $id_ruangan) ? 'active' : '';
-                ?>
-                    <a href="ruangan.php?id=<?= $r['id_ruangan']; ?>" class="menu-item <?= $activeClass; ?>">
-                        <div class="menu-left"><i class="ph ph-house"></i> <?= htmlspecialchars($r['nama_ruangan']); ?></div>
-                        <span class="badge"><?= $r['total_barang']; ?></span>
-                    </a>
-                <?php } ?>
-            </div>
-        </nav>
-
-        <div class="sidebar-footer">
-            <div class="menu-label" style="margin: 0 0 10px 0;">Sekolah</div>
-            <h4>SMK TARUNA BANGSA</h4>
-            <p>Tahun Ajaran 2024/2025</p>
-        </div>
-    </aside>
-
-    <main class="main-content">
-        <header class="topbar" style="display: flex; justify-content: space-between; align-items: center;">
-            <div class="breadcrumb">
-                SIVENPRAS-TB &rsaquo; Ruangan &rsaquo; <span><?= htmlspecialchars($d_ruangan['nama_ruangan']); ?></span>
-            </div>
-        </header>
-
         <div class="dashboard-container" style="padding: 24px;">
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -822,6 +574,4 @@ $q_list = mysqli_query($koneksi, $sql_list);
             }
         });
     </script>
-</body>
-
-</html>
+<?php  include 'includes/footer.php'; ?>

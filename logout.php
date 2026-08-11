@@ -1,14 +1,12 @@
 <?php
-$host     = "localhost";
-$username = "root";       
-$password = "";           
-$dbname   = "sivenpras_tb";
+session_start();
 
-$conn = new mysqli($host, $username, $password, $dbname);
+// Hapus semua data session
+$_SESSION = [];
+session_unset();
+session_destroy();
 
-if ($conn->connect_error) {
-    die("Koneksi ke database gagal: " . $conn->connect_error);
-}
-
-$conn->set_charset("utf8mb4");
+// Redirect / kembalikan user ke halaman login
+header("Location: login.php");
+exit;
 ?>

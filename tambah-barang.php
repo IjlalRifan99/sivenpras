@@ -1,6 +1,14 @@
 <?php
+session_start();
 include 'config/koneksi.php';
 
+if (!isset($_SESSION['login'])) {
+    header("Location: login.php");
+    exit;
+}
+
+$active_page = 'tambah';
+$breadcrumb = 'Tambah barang';
 $pesan_sukses = "";
 $pesan_error = "";
 
@@ -31,10 +39,10 @@ if ($id_ruangan > 0) {
 // PROSES FORM SUBMIT
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if ($id_ruangan > 0) {
-        $id_barang       = isset($_POST['id_barang']) ? (int) $_POST['id_barang'] : 0;
-        $jumlah          = isset($_POST['jumlah']) ? (int) $_POST['jumlah'] : 0;
+        $id_barang = isset($_POST['id_barang']) ? (int) $_POST['id_barang'] : 0;
+        $jumlah = isset($_POST['jumlah']) ? (int) $_POST['jumlah'] : 0;
         $tahun_perolehan = isset($_POST['tahun_perolehan']) ? (int) $_POST['tahun_perolehan'] : $current_year;
-        $keterangan      = mysqli_real_escape_string($koneksi, $_POST['keterangan'] ?? '');
+        $keterangan = mysqli_real_escape_string($koneksi, $_POST['keterangan'] ?? '');
 
         if ($id_barang === 0 || $jumlah <= 0) {
             $pesan_error = "Harap pilih jenis barang dan masukkan jumlah unit yang valid.";
@@ -92,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $nama_barang = trim(mysqli_real_escape_string($koneksi, $_POST['nama_barang'] ?? ''));
         $id_kategori = isset($_POST['id_kategori']) ? (int) $_POST['id_kategori'] : 0;
         $kode_barang = trim(mysqli_real_escape_string($koneksi, $_POST['kode_barang'] ?? ''));
-        $keterangan  = mysqli_real_escape_string($koneksi, $_POST['keterangan'] ?? '');
+        $keterangan = mysqli_real_escape_string($koneksi, $_POST['keterangan'] ?? '');
 
         if ($nama_barang === '' || $id_kategori <= 0 || $kode_barang === '') {
             $pesan_error = "Silakan lengkapi Nama Barang, Kategori, dan Kode Barang.";
@@ -126,177 +134,143 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 ?>
 
-<!DOCTYPE html>
-<html lang="id">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SIVENPRAS - Tambah Barang</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-</head>
-
-<body>
-
-    <aside class="sidebar">
-        <div class="sidebar-brand">
-            <div class="brand-icon">
-                <i class="ph-bold ph-archive-box"></i>
-            </div>
-            <div class="brand-text">
-                <h2>SIVENPRAS-TB</h2>
-                <p>Sistem Inventaris Sarpras</p>
-            </div>
-        </div>
-
-        <nav class="sidebar-menu">
-            <div class="menu-label">Menu Utama</div>
-            <a href="index.php" class="menu-item">
-                <div class="menu-left"><i class="ph ph-squares-four"></i> Dashboard</div>
-            </a>
-            <a href="daftar-inventaris.php" class="menu-item">
-                <div class="menu-left"><i class="ph ph-clipboard-text"></i> Daftar Inventaris</div>
-            </a>
-            <a href="tambah-barang.php" class="menu-item active">
-                <div class="menu-left"><i class="ph ph-plus"></i> Tambah Barang</div>
-            </a>
-            <a href="laporan.php" class="menu-item">
-                <div class="menu-left"><i class="ph ph-chart-bar"></i> Laporan</div>
-            </a>
-
-            <div class="menu-label" style="margin-top: 30px;">
-                Ruangan <i class="ph ph-caret-up" style="float: right;"></i>
-            </div>
-
-            <?php while ($r = mysqli_fetch_assoc($q_ruangan_sidebar)) { ?>
-                <a href="ruangan.php?id=<?= $r['id_ruangan']; ?>" class="menu-item">
-                    <div class="menu-left"><i class="ph ph-house"></i> <?= htmlspecialchars($r['nama_ruangan']); ?></div>
-                    <span class="badge"><?= $r['total_barang']; ?></span>
-                </a>
-            <?php } ?>
-        </nav>
-
-        <div class="sidebar-footer">
-            <div class="menu-label" style="margin: 0 0 10px 0;">Sekolah</div>
-            <h4>SMK TARUNA BANGSA</h4>
-            <p>Tahun Ajaran 2024/2025</p>
-        </div>
-    </aside>
-
-    <main class="main-content">
-        <header class="topbar">
-            <div class="breadcrumb">
-                SIVENPRAS-TB &rsaquo; <span>Tambah Barang</span>
-            </div>
-            <div class="topbar-actions">
-                <div class="avatar">AD</div>
-            </div>
-        </header>
+<?php include 'includes/header.php'; ?>
 
         <div class="dashboard-container">
             <?php if (!empty($pesan_sukses)) { ?>
-                <div style="background: #dcfce7; color: #15803d; padding: 14px 18px; border-radius: 8px; margin-bottom: 20px; font-weight: 500; border-left: 4px solid #22c55e;">
+                <div
+                    style="background: #dcfce7; color: #15803d; padding: 14px 18px; border-radius: 8px; margin-bottom: 20px; font-weight: 500; border-left: 4px solid #22c55e;">
                     <?= $pesan_sukses; ?>
                 </div>
             <?php } ?>
 
             <?php if (!empty($pesan_error)) { ?>
-                <div style="background: #fee2e2; color: #b91c1c; padding: 14px 18px; border-radius: 8px; margin-bottom: 20px; font-weight: 500; border-left: 4px solid #ef4444;">
+                <div
+                    style="background: #fee2e2; color: #b91c1c; padding: 14px 18px; border-radius: 8px; margin-bottom: 20px; font-weight: 500; border-left: 4px solid #ef4444;">
                     <?= $pesan_error; ?>
                 </div>
             <?php } ?>
 
-            <form method="POST" action="tambah-barang.php<?= $id_ruangan > 0 ? '?id_ruangan=' . $id_ruangan : '' ?>" class="widget-card" style="padding: 24px; max-width: 900px; background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                <?php if ($id_ruangan > 0) : ?>
+            <form method="POST" action="tambah-barang.php<?= $id_ruangan > 0 ? '?id_ruangan=' . $id_ruangan : '' ?>"
+                class="widget-card"
+                style="padding: 24px; max-width: 900px; background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <?php if ($id_ruangan > 0): ?>
                     <input type="hidden" name="id_ruangan" value="<?= $id_ruangan; ?>">
                     <div style="margin-bottom: 24px;">
-                        <h4 style="color: #0f172a; margin-bottom: 16px; font-size: 14px; letter-spacing: 0.5px; border-left: 3px solid #0d9488; padding-left: 8px;">
+                        <h4
+                            style="color: #0f172a; margin-bottom: 16px; font-size: 14px; letter-spacing: 0.5px; border-left: 3px solid #0d9488; padding-left: 8px;">
                             TAMBAH UNIT BARANG DI RUANGAN <?= htmlspecialchars($ruangan['nama_ruangan']); ?>
                         </h4>
 
                         <div style="display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px;">
                             <div>
-                                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+                                <label
+                                    style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
                                     NAMA BARANG <span style="color:red;">*</span>
                                 </label>
-                                <select name="id_barang" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                                <select name="id_barang" required
+                                    style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
                                     <option value="">-- Pilih Barang --</option>
                                     <?php while ($b = mysqli_fetch_assoc($q_barang_katalog)) { ?>
-                                        <option value="<?= $b['id_barang']; ?>"><?= htmlspecialchars($b['nama_barang']); ?> (<?= htmlspecialchars($b['kode_barang']); ?>)</option>
+                                        <option value="<?= $b['id_barang']; ?>"><?= htmlspecialchars($b['nama_barang']); ?>
+                                            (<?= htmlspecialchars($b['kode_barang']); ?>)</option>
                                     <?php } ?>
                                 </select>
                             </div>
                             <div>
-                                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+                                <label
+                                    style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
                                     JUMLAH UNIT <span style="color:red;">*</span>
                                 </label>
-                                <input type="number" name="jumlah" value="1" min="1" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                                <input type="number" name="jumlah" value="1" min="1" required
+                                    style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
                             </div>
                         </div>
                     </div>
 
                     <div style="margin-bottom: 24px;">
-                        <h4 style="color: #0f172a; margin-bottom: 16px; font-size: 14px; letter-spacing: 0.5px; border-left: 3px solid #0d9488; padding-left: 8px;">
+                        <h4
+                            style="color: #0f172a; margin-bottom: 16px; font-size: 14px; letter-spacing: 0.5px; border-left: 3px solid #0d9488; padding-left: 8px;">
                             DATA PEROLEHAN
                         </h4>
 
                         <div style="display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px;">
                             <div>
-                                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+                                <label
+                                    style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
                                     TAHUN PEROLEHAN
                                 </label>
-                                <input type="number" name="tahun_perolehan" value="<?= $current_year; ?>" min="2000" max="2099" style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                                <input type="number" name="tahun_perolehan" value="<?= $current_year; ?>" min="2000"
+                                    max="2099"
+                                    style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
                             </div>
                         </div>
 
                         <div>
-                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">KETERANGAN</label>
-                            <textarea name="keterangan" rows="3" placeholder="Catatan tambahan tentang unit ini (opsional)" style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; resize: vertical;"></textarea>
+                            <label
+                                style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">KETERANGAN</label>
+                            <textarea name="keterangan" rows="3" placeholder="Catatan tambahan tentang unit ini (opsional)"
+                                style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; resize: vertical;"></textarea>
                         </div>
                     </div>
-                <?php else : ?>
+                <?php else: ?>
                     <div style="margin-bottom: 24px;">
-                        <h4 style="color: #0f172a; margin-bottom: 16px; font-size: 14px; letter-spacing: 0.5px; border-left: 3px solid #0d9488; padding-left: 8px;">
+                        <h4
+                            style="color: #0f172a; margin-bottom: 16px; font-size: 14px; letter-spacing: 0.5px; border-left: 3px solid #0d9488; padding-left: 8px;">
                             TAMBAH MASTER BARANG
                         </h4>
 
                         <div style="display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px;">
                             <div>
-                                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+                                <label
+                                    style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
                                     NAMA BARANG <span style="color:red;">*</span>
                                 </label>
-                                <input type="text" name="nama_barang" value="<?= htmlspecialchars($nama_barang ?? ''); ?>" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                                <input type="text" name="nama_barang" value="<?= htmlspecialchars($nama_barang ?? ''); ?>"
+                                    required
+                                    style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
                             </div>
                             <div>
-                                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+                                <label
+                                    style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
                                     KODE BARANG <span style="color:red;">*</span>
                                 </label>
-                                <input type="text" name="kode_barang" value="<?= htmlspecialchars($kode_barang ?? ''); ?>" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                                <input type="text" name="kode_barang" value="<?= htmlspecialchars($kode_barang ?? ''); ?>"
+                                    required
+                                    style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
                             </div>
                             <div>
-                                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+                                <label
+                                    style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
                                     KATEGORI <span style="color:red;">*</span>
                                 </label>
-                                <select name="id_kategori" required style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                                <select name="id_kategori" required
+                                    style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
                                     <option value="">-- Pilih Kategori --</option>
                                     <?php while ($k = mysqli_fetch_assoc($q_kategori)) { ?>
-                                        <option value="<?= $k['id_kategori']; ?>" <?= isset($id_kategori) && $id_kategori == $k['id_kategori'] ? 'selected' : ''; ?>><?= htmlspecialchars($k['nama_kategori']); ?></option>
+                                        <option value="<?= $k['id_kategori']; ?>" <?= isset($id_kategori) && $id_kategori == $k['id_kategori'] ? 'selected' : ''; ?>>
+                                            <?= htmlspecialchars($k['nama_kategori']); ?></option>
                                     <?php } ?>
                                 </select>
                             </div>
                         </div>
 
                         <div>
-                            <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">KETERANGAN</label>
-                            <textarea name="keterangan" rows="3" placeholder="Catatan tambahan tentang barang ini (opsional)" style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; resize: vertical;"><?= htmlspecialchars($keterangan ?? ''); ?></textarea>
+                            <label
+                                style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">KETERANGAN</label>
+                            <textarea name="keterangan" rows="3"
+                                placeholder="Catatan tambahan tentang barang ini (opsional)"
+                                style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; resize: vertical;"><?= htmlspecialchars($keterangan ?? ''); ?></textarea>
                         </div>
                     </div>
                 <?php endif; ?>
 
-                <div style="display: flex; gap: 12px; justify-content: flex-end; border-top: 1px solid #f1f5f9; padding-top: 16px;">
-                    <a href="daftar-inventaris.php" style="padding: 10px 20px; border: 1px solid #cbd5e1; border-radius: 8px; text-decoration: none; color: #475569; font-weight: 600; font-size: 14px;">Batal</a>
-                    <button type="submit" class="btn-primary" style="padding: 10px 24px; font-size: 14px; cursor: pointer;">Simpan Barang</button>
+                <div
+                    style="display: flex; gap: 12px; justify-content: flex-end; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+                    <a href="daftar-inventaris.php"
+                        style="padding: 10px 20px; border: 1px solid #cbd5e1; border-radius: 8px; text-decoration: none; color: #475569; font-weight: 600; font-size: 14px;">Batal</a>
+                    <button type="submit" class="btn-primary"
+                        style="padding: 10px 24px; font-size: 14px; cursor: pointer;">Simpan Barang</button>
                 </div>
             </form>
         </div>
@@ -323,33 +297,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.text())
-            .then(text => {
-                try {
-                    var data = JSON.parse(text);
-                    if (data.status === 'success') {
-                        inputKode.value = data.kode_barang;
-                        if (data.kategori_id && data.kategori_id != 0) {
-                            selectKategori.value = String(data.kategori_id);
+                .then(response => response.text())
+                .then(text => {
+                    try {
+                        var data = JSON.parse(text);
+                        if (data.status === 'success') {
+                            inputKode.value = data.kode_barang;
+                            if (data.kategori_id && data.kategori_id != 0) {
+                                selectKategori.value = String(data.kategori_id);
+                            } else {
+                                selectKategori.value = "";
+                            }
                         } else {
+                            inputKode.value = "";
                             selectKategori.value = "";
                         }
-                    } else {
+                    } catch (e) {
+                        console.error("Respon bukan JSON valid:", text);
                         inputKode.value = "";
-                        selectKategori.value = "";
                     }
-                } catch (e) {
-                    console.error("Respon bukan JSON valid:", text);
+                })
+                .catch(error => {
+                    console.error('Error Fetch:', error);
                     inputKode.value = "";
-                }
-            })
-            .catch(error => {
-                console.error('Error Fetch:', error);
-                inputKode.value = "";
-            });
+                });
         }
     </script>
-
-</body>
-
-</html>
+<?php include 'includes/footer.php'; ?>
