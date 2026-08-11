@@ -576,11 +576,11 @@ include 'includes/header.php';
         startCamera();
     });
 
-    window.addEventListener('pageshow', function() {
-        if (!stream) {
-            startCamera();
-        }
-    });
+    // window.addEventListener('pageshow', function() {
+    //     if (!stream) {
+    //         startCamera();
+    //     }
+    // });
 
     renderQrCell();
 </script>
