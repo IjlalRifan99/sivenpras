@@ -25,7 +25,7 @@ if (!isset($breadcrumb)) $breadcrumb = 'Dashboard';
         </div>
 
         <div class="topbar-actions">
-            <?php if (($active_page ?? '') !== 'ruangan' && ($active_page ?? '') !== 'tambah'): ?>
+            <?php if (($active_page ?? '') !== 'ruangan' && ($active_page ?? '') !== 'tambah'  && ($active_page ?? '') !== 'laporan'): ?>
                 <a href="tambah-barang.php" class="btn-primary" style="text-decoration: none;">
                     <i class="bi bi-plus-lg"></i>
                     Tambah Barang

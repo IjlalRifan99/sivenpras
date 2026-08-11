@@ -71,7 +71,7 @@ $nama_ruangan = $ruangan['nama_ruangan'];
 
 $page_title = $nama_ruangan;
 $breadcrumb = "Ruangan > " . $nama_ruangan;
-$page_title = 'Ruangan';
+$page_title = "Ruangan " . $nama_ruangan;
 
 // Handler Update Kondisi via AJAX / POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_kondisi'], $_POST['id_inventaris'])) {

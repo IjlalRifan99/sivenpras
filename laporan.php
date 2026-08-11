@@ -2,114 +2,124 @@
 session_start();
 include 'config/koneksi.php';
 
+// Check Session Login
 if (!isset($_SESSION['login'])) {
     header("Location:login.php");
     exit;
 }
 
+// Tangkap Filter
 $kategori_id = isset($_GET['kategori']) ? mysqli_real_escape_string($koneksi, $_GET['kategori']) : '';
-$ruangan_id = isset($_GET['ruangan']) ? mysqli_real_escape_string($koneksi, $_GET['ruangan']) : '';
-$kondisi = isset($_GET['kondisi']) ? mysqli_real_escape_string($koneksi, $_GET['kondisi']) : '';
+$ruangan_id  = isset($_GET['ruangan']) ? mysqli_real_escape_string($koneksi, $_GET['ruangan']) : '';
+$kondisi     = isset($_GET['kondisi']) ? mysqli_real_escape_string($koneksi, $_GET['kondisi']) : '';
 
+// Query Condition Filter
 $where_kategori = !empty($kategori_id) ? "AND b.kategori_id = '$kategori_id'" : "";
-$where_ruangan = !empty($ruangan_id) ? "AND i.ruangan_id = '$ruangan_id'" : "";
-$where_kondisi = !empty($kondisi) ? "AND i.kondisi = '$kondisi'" : "";
+$where_ruangan  = !empty($ruangan_id) ? "AND i.ruangan_id = '$ruangan_id'" : "";
+$where_kondisi  = !empty($kondisi) ? "AND i.kondisi = '$kondisi'" : "";
 
 if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
-    $file_name = "Laporan inventaris SIVENPRAS" . date('Y-m-d') . ".xls";
+    
+    $file_name = "Laporan_Inventaris_SIVENPRAS_" . date('Y-m-d') . ".xls";
 
-    header("Content-Type: application/vnd.ms-excel");
-    header("Content-Disposition: attachment; filename=\"$filename\"");
+    if (ob_get_length()) ob_clean();
 
+    header("Content-Type: application/vnd.ms-excel; charset=utf-8");
+    header("Content-Disposition: attachment; filename=\"" . $file_name . "\"");
+    header("Pragma: no-cache");
+    header("Expires: 0");
+
+    // Query Data Excel Kategori
     $q_excel_kat = mysqli_query($koneksi, "SELECT
-    k.nama_kategori,
-    COUNT(i.id_inventaris) AS total,
-    SUM(CASE WHEN i.kondisi = 'baik' THEN 1 ELSE 0 END) AS baik,
-    SUM(CASE WHEN i.kondisi = 'rusak' THEN 1 ELSE 0 END) AS rusak,
-    SUM(CASE WHEN i.kondisi = 'hilang' THEN 1 ELSE 0 END) AS hilang
-    FROM kategori k
-    LEFT JOIN barang b ON k.id_kategori = b.kategori_id $where_kategori
-    LEFT JOIN inventaris i ON b.id_barang = i.barang_id $where_ruangan $where_kondisi
-    GROUP BY k.id_kategori
-    HAVING total > 0 
-    ORDER BY k.nama_kategori ASC");
+        k.nama_kategori,
+        COUNT(i.id_inventaris) AS total,
+        SUM(CASE WHEN i.kondisi = 'baik' THEN 1 ELSE 0 END) AS baik,
+        SUM(CASE WHEN i.kondisi = 'rusak' THEN 1 ELSE 0 END) AS rusak,
+        SUM(CASE WHEN i.kondisi = 'hilang' THEN 1 ELSE 0 END) AS hilang
+        FROM kategori k
+        LEFT JOIN barang b ON k.id_kategori = b.kategori_id $where_kategori
+        LEFT JOIN inventaris i ON b.id_barang = i.barang_id $where_ruangan $where_kondisi
+        GROUP BY k.id_kategori
+        HAVING total > 0 
+        ORDER BY k.nama_kategori ASC");
 
+    // Query Data Excel Ruangan
     $q_excel_ruang = mysqli_query($koneksi, "SELECT
-    r.nama_ruangan,
-    COUNT(i.id_inventaris) AS total,
-    SUM(CASE WHEN i.kondisi = 'baik' THEN 1 ELSE 0 END) AS baik,
-    SUM(CASE WHEN i.kondisi = 'rusak' THEN 1 ELSE 0 END) AS rusak,
-    SUM(CASE WHEN i.kondisi = 'hilang' THEN 1 ELSE 0 END) AS hilang
-    FROM ruangan r
-    LEFT JOIN inventaris i ON r.id_ruangan = i.ruangan_id $where_ruangan $where_kondisi
-    LEFT JOIN barang b ON i.barang_id = b.id_barang $where_kategori
-    GROUP BY r.id_ruangan
-    HAVING total > 0
-    ORDER BY r.nama_ruangan ASC");
+        r.nama_ruangan,
+        COUNT(i.id_inventaris) AS total,
+        SUM(CASE WHEN i.kondisi = 'baik' THEN 1 ELSE 0 END) AS baik,
+        SUM(CASE WHEN i.kondisi = 'rusak' THEN 1 ELSE 0 END) AS rusak,
+        SUM(CASE WHEN i.kondisi = 'hilang' THEN 1 ELSE 0 END) AS hilang
+        FROM ruangan r
+        LEFT JOIN inventaris i ON r.id_ruangan = i.ruangan_id $where_ruangan $where_kondisi
+        LEFT JOIN barang b ON i.barang_id = b.id_barang $where_kategori
+        GROUP BY r.id_ruangan
+        HAVING total > 0
+        ORDER BY r.nama_ruangan ASC");
 ?>
 <h3>LAPORAN REKAP INVENTARIS SARPRAS</h3>
 <p>SMK TARUNA BANGSA - Tanggal Unduh: <?= date('d-m-Y H:i'); ?></p>
 <br>
 
 <h4>1. REKAP PER KATEGORI</h4>
-    <table border="1" cellpadding="5">
-        <thead>
-            <tr style="background-color: #0d9488; color: #ffffff;">
-                <th>No</th>
-                <th>Kategori</th>
-                <th>Total</th>
-                <th>Baik</th>
-                <th>Rusak</th>
-                <th>Hilang</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php 
-            $no = 1;
-            while($row = mysqli_fetch_assoc($q_excel_kat)): 
-            ?>
-            <tr>
-                <td><?= $no++; ?></td>
-                <td><?= $row['nama_kategori']; ?></td>
-                <td><?= $row['total']; ?></td>
-                <td><?= $row['baik']; ?></td>
-                <td><?= $row['rusak']; ?></td>
-                <td><?= $row['hilang']; ?></td>
-            </tr>
-            <?php endwhile; ?>
-        </tbody>
-    </table>
+<table border="1" cellpadding="5">
+    <thead>
+        <tr style="background-color: #0d9488; color: #ffffff;">
+            <th>No</th>
+            <th>Kategori</th>
+            <th>Total</th>
+            <th>Baik</th>
+            <th>Rusak</th>
+            <th>Hilang</th>
+        </tr>
+    </thead>
+    <tbody>
+        <?php 
+        $no = 1;
+        while($row = mysqli_fetch_assoc($q_excel_kat)): 
+        ?>
+        <tr>
+            <td><?= $no++; ?></td>
+            <td><?= htmlspecialchars($row['nama_kategori']); ?></td>
+            <td><?= $row['total']; ?></td>
+            <td><?= $row['baik']; ?></td>
+            <td><?= $row['rusak']; ?></td>
+            <td><?= $row['hilang']; ?></td>
+        </tr>
+        <?php endwhile; ?>
+    </tbody>
+</table>
 
-    <br>
-    <h4>2. REKAP PER RUANGAN</h4>
-    <table border="1" cellpadding="5">
-        <thead>
-            <tr style="background-color: #0d9488; color: #ffffff;">
-                <th>No</th>
-                <th>Ruangan</th>
-                <th>Total Barang</th>
-                <th>Baik</th>
-                <th>Rusak</th>
-                <th>Hilang</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php 
-            $no = 1;
-            while($row = mysqli_fetch_assoc($q_excel_ruang)): 
-            ?>
-            <tr>
-                <td><?= $no++; ?></td>
-                <td><?= $row['nama_ruangan']; ?></td>
-                <td><?= $row['total']; ?></td>
-                <td><?= $row['baik']; ?></td>
-                <td><?= $row['rusak']; ?></td>
-                <td><?= $row['hilang']; ?></td>
-            </tr>
-            <?php endwhile; ?>
-        </tbody>
-    </table>
-    <?php
+<br>
+<h4>2. REKAP PER RUANGAN</h4>
+<table border="1" cellpadding="5">
+    <thead>
+        <tr style="background-color: #0d9488; color: #ffffff;">
+            <th>No</th>
+            <th>Ruangan</th>
+            <th>Total Barang</th>
+            <th>Baik</th>
+            <th>Rusak</th>
+            <th>Hilang</th>
+        </tr>
+    </thead>
+    <tbody>
+        <?php 
+        $no = 1;
+        while($row = mysqli_fetch_assoc($q_excel_ruang)): 
+        ?>
+        <tr>
+            <td><?= $no++; ?></td>
+            <td><?= htmlspecialchars($row['nama_ruangan']); ?></td>
+            <td><?= $row['total']; ?></td>
+            <td><?= $row['baik']; ?></td>
+            <td><?= $row['rusak']; ?></td>
+            <td><?= $row['hilang']; ?></td>
+        </tr>
+        <?php endwhile; ?>
+    </tbody>
+</table>
+<?php
     exit;
 }
 
@@ -151,7 +161,7 @@ $query_rekap_ruangan = "
 ";
 $result_rekap_ruangan = mysqli_query($koneksi, $query_rekap_ruangan);
 
-// Dropdown Data
+// Dropdown Data Filter
 $q_kategori = mysqli_query($koneksi, "SELECT * FROM kategori ORDER BY nama_kategori ASC");
 $q_ruangan  = mysqli_query($koneksi, "SELECT * FROM ruangan ORDER BY nama_ruangan ASC");
 ?>
@@ -209,7 +219,7 @@ $q_ruangan  = mysqli_query($koneksi, "SELECT * FROM ruangan ORDER BY nama_ruanga
 
         </form>
 
-        <div style="margin-top: 15px; pt-3; border-top: 1px solid #f1f5f9; display: flex; gap: 10px; justify-content: flex-end;">
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f1f5f9; display: flex; gap: 10px; justify-content: flex-end;">
             <a href="laporan.php?action=export_excel&kategori=<?= $kategori_id; ?>&ruangan=<?= $ruangan_id; ?>&kondisi=<?= $kondisi; ?>" class="btn-export-excel">
                 📊 Export Excel
             </a>
@@ -300,21 +310,6 @@ $q_ruangan  = mysqli_query($koneksi, "SELECT * FROM ruangan ORDER BY nama_ruanga
         </table>
     </div>
 
-    <!-- <div class="print-footer print-only" style="margin-top: 50px; display: flex; justify-content: space-between;">
-        <div style="text-align: center; width: 220px;">
-            <p style="margin: 0;">Mengetahui,</p>
-            <p style="margin: 0; font-weight: bold;">Kepala Sekolah</p>
-            <br><br><br><br>
-            <p style="margin: 0;">____________________</p>
-        </div>
-        <div style="text-align: center; width: 220px;">
-            <p style="margin: 0;">Bekasi, <?= date('d F Y'); ?></p>
-            <p style="margin: 0; font-weight: bold;">Pengelola Sarpras</p>
-            <br><br><br><br>
-            <p style="margin: 0;">____________________</p>
-        </div>
-    </div> -->
-
 </div>
 
 <style>
@@ -396,7 +391,7 @@ $q_ruangan  = mysqli_query($koneksi, "SELECT * FROM ruangan ORDER BY nama_ruanga
         display: none;
     }
 
-    /* MEDIA PRINT (Saat Di-Cetak) */
+    /* MEDIA PRINT */
     @media print {
         .no-print, .sidebar, header, nav, .top-navbar {
             display: none !important;
