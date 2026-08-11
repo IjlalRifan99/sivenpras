@@ -48,7 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Halaman Login - SIVENPRAS</title>
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         * {
             margin: 0;
@@ -183,8 +182,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 
     <div class="login-card">
-        <div class="avatar-circle">
-            <i class="ph-fill ph-user"></i>
+        <div class="avatar-circle" aria-hidden="true">
+            U
         </div>
 
         <div class="login-header">

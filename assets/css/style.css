@@ -2,8 +2,6 @@
    SIVENPRAS - TB : GAYA UTAMA (STYLE.CSS)
    ========================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-
 :root {
     --primary-dark: #164e5a;     /* Warna Sidebar */
     --primary-light: #256b7a;    /* Hover/Active Sidebar */
@@ -19,8 +17,8 @@
     --warning: #f59e0b;
     --danger: #ef4444;
     
-    --font-heading: 'Lora', serif;
-    --font-body: 'Plus Jakarta Sans', sans-serif;
+    --font-heading: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --font-body: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 * {
@@ -46,7 +44,7 @@ body {
     flex-direction: column;
     position: fixed;
     height: 100vh;
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 .sidebar-brand {
@@ -101,8 +99,11 @@ body {
 }
 
 .sidebar-menu {
-    padding: 20px 0;
-    flex-grow: 1;
+    padding: 20px 0 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 .menu-label {
@@ -132,9 +133,27 @@ body {
     gap: 12px;
 }
 
-.menu-item i {
+.menu-item .menu-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     font-size: 18px;
     width: 20px;
+    line-height: 1;
+    color: inherit;
+}
+
+.mini-icon {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.icon-inline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
 }
 
 .menu-item:hover {

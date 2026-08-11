@@ -48,7 +48,7 @@ include 'includes/header.php';
         <div class="stat-card">
             <div class="stat-header">
                 <h3>Total Barang</h3>
-                <div class="icon-wrapper icon-teal"><i class="ph-bold ph-cube"></i></div>
+                <div class="icon-wrapper icon-teal"><span class="icon-inline" aria-hidden="true">📦</span></div>
             </div>
             <div class="stat-value teal"><?= number_format($total_barang); ?></div>
             <div class="stat-desc"><?= $total_jenis; ?> jenis barang</div>
@@ -56,7 +56,7 @@ include 'includes/header.php';
         <div class="stat-card">
             <div class="stat-header">
                 <h3>Kondisi Baik</h3>
-                <div class="icon-wrapper icon-green"><i class="ph-bold ph-check-circle"></i></div>
+                <div class="icon-wrapper icon-green"><span class="icon-inline" aria-hidden="true">✓</span></div>
             </div>
             <div class="stat-value green"><?= number_format($kondisi_baik); ?></div>
             <div class="stat-desc"><?= $persen_baik; ?>% dari total</div>
@@ -64,7 +64,7 @@ include 'includes/header.php';
         <div class="stat-card">
             <div class="stat-header">
                 <h3>Rusak Ringan</h3>
-                <div class="icon-wrapper icon-yellow"><i class="ph-bold ph-warning"></i></div>
+                <div class="icon-wrapper icon-yellow"><span class="icon-inline" aria-hidden="true">⚠</span></div>
             </div>
             <div class="stat-value yellow"><?= number_format($rusak_ringan); ?></div>
             <div class="stat-desc">Perlu perhatian</div>
@@ -72,7 +72,7 @@ include 'includes/header.php';
         <div class="stat-card">
             <div class="stat-header">
                 <h3>Rusak Berat</h3>
-                <div class="icon-wrapper icon-red"><i class="ph-bold ph-x-circle"></i></div>
+                <div class="icon-wrapper icon-red"><span class="icon-inline" aria-hidden="true">✕</span></div>
             </div>
             <div class="stat-value red"><?= number_format($rusak_berat); ?></div>
             <div class="stat-desc">Perlu penggantian</div>

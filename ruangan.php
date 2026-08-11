@@ -13,7 +13,49 @@ $active_page = 'ruangan';
 $id_ruangan = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 if ($id_ruangan == 0) {
-    header("Location: index.php");
+    $q_ruangan_sidebar = mysqli_query($koneksi, "
+        SELECT r.id_ruangan, r.nama_ruangan, COUNT(i.id_inventaris) AS total_barang 
+        FROM ruangan r 
+        LEFT JOIN inventaris i ON r.id_ruangan = i.ruangan_id 
+        GROUP BY r.id_ruangan, r.nama_ruangan 
+        ORDER BY r.nama_ruangan ASC
+    ");
+
+    $page_title = 'Ruangan';
+    $breadcrumb = 'Ruangan';
+    include 'includes/header.php';
+    ?>
+        <div class="dashboard-container" style="padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h1 style="font-size: 26px; color: #0f172a; font-weight: 700;">Pilih Ruangan</h1>
+            </div>
+
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                <?php if ($q_ruangan_sidebar && mysqli_num_rows($q_ruangan_sidebar) > 0): ?>
+                    <?php while ($room = mysqli_fetch_assoc($q_ruangan_sidebar)): ?>
+                        <a href="ruangan.php?id=<?= (int) $room['id_ruangan']; ?>" style="text-decoration: none; color: inherit;">
+                            <div class="widget-card" style="height: 100%; min-height: 140px; display: flex; flex-direction: column; justify-content: space-between;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                                    <span style="font-size: 18px; font-weight: 700; color: #0f172a;"><?= htmlspecialchars($room['nama_ruangan']); ?></span>
+                                    <span class="badge" style="background: rgba(15, 118, 110, 0.12); color: #0f766e; padding: 6px 10px; font-size: 12px; min-width: 32px; text-align: center;">
+                                        <?= (int) ($room['total_barang'] ?? 0); ?>
+                                    </span>
+                                </div>
+                                <div style="margin-top: 20px; font-size: 13px; color: #64748b;">
+                                    Lihat inventaris ruangan
+                                </div>
+                            </div>
+                        </a>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <div class="widget-card" style="grid-column: 1 / -1; text-align: center; color: #64748b;">
+                        Belum ada data ruangan.
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    <?php
+    include 'includes/footer.php';
     exit;
 }
 
@@ -50,16 +92,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_kondisi'], $_P
         $d_b = mysqli_fetch_assoc($q_b);
         $stat_baik = $d_b['total'] ?? 0;
 
-        $q_p = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi != 'baik'");
-        $d_p = mysqli_fetch_assoc($q_p);
-        $stat_perhatian = $d_p['total'] ?? 0;
+        $q_c = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi = 'cukup baik'");
+        $d_c = mysqli_fetch_assoc($q_c);
+        $stat_cukup = $d_c['total'] ?? 0;
+
+        $q_r = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi = 'rusak'");
+        $d_r = mysqli_fetch_assoc($q_r);
+        $stat_rusak = $d_r['total'] ?? 0;
+
+        $q_rp = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi = 'rusak parah'");
+        $d_rp = mysqli_fetch_assoc($q_rp);
+        $stat_rusak_parah = $d_rp['total'] ?? 0;
+
+        $q_h = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi = 'hilang'");
+        $d_h = mysqli_fetch_assoc($q_h);
+        $stat_hilang = $d_h['total'] ?? 0;
 
         echo json_encode([
-            'success'        => $success,
-            'kondisi'        => $kondisi,
-            'total_baik'     => $stat_baik,
-            'total_perhatian'=> $stat_perhatian,
-            'message'        => $success ? 'Kondisi berhasil disimpan.' : 'Gagal menyimpan kondisi.'
+            'success'            => $success,
+            'kondisi'            => $kondisi,
+            'total_baik'         => $stat_baik,
+            'total_cukup'        => $stat_cukup,
+            'total_rusak'        => $stat_rusak,
+            'total_rusak_parah'  => $stat_rusak_parah,
+            'total_hilang'       => $stat_hilang,
+            'message'            => $success ? 'Kondisi berhasil disimpan.' : 'Gagal menyimpan kondisi.'
         ]);
         exit;
     }
@@ -123,17 +180,29 @@ $q_stat_jenis = mysqli_query($koneksi, "SELECT COUNT(DISTINCT barang_id) AS tota
 $d_stat_jenis = mysqli_fetch_assoc($q_stat_jenis);
 $total_jenis = $d_stat_jenis['total_jenis'] ?? 0;
 
-$q_stat_satuan = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total_satuan FROM inventaris WHERE ruangan_id = '$id_ruangan'");
-$d_stat_satuan = mysqli_fetch_assoc($q_stat_satuan);
-$total_satuan = $d_stat_satuan['total_satuan'] ?? 0;
+$q_stat_total = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total_barang FROM inventaris WHERE ruangan_id = '$id_ruangan'");
+$d_stat_total = mysqli_fetch_assoc($q_stat_total);
+$total_barang = $d_stat_total['total_barang'] ?? 0;
 
 $q_stat_baik = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total_baik FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi = 'baik'");
 $d_stat_baik = mysqli_fetch_assoc($q_stat_baik);
 $total_baik = $d_stat_baik['total_baik'] ?? 0;
 
-$q_stat_perhatian = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total_perhatian FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi != 'baik'");
-$d_stat_perhatian = mysqli_fetch_assoc($q_stat_perhatian);
-$total_perhatian = $d_stat_perhatian['total_perhatian'] ?? 0;
+$q_stat_cukup = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total_cukup FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi = 'cukup baik'");
+$d_stat_cukup = mysqli_fetch_assoc($q_stat_cukup);
+$total_cukup = $d_stat_cukup['total_cukup'] ?? 0;
+
+$q_stat_rusak = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total_rusak FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi = 'rusak'");
+$d_stat_rusak = mysqli_fetch_assoc($q_stat_rusak);
+$total_rusak = $d_stat_rusak['total_rusak'] ?? 0;
+
+$q_stat_rusak_parah = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total_rusak_parah FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi = 'rusak parah'");
+$d_stat_rusak_parah = mysqli_fetch_assoc($q_stat_rusak_parah);
+$total_rusak_parah = $d_stat_rusak_parah['total_rusak_parah'] ?? 0;
+
+$q_stat_hilang = mysqli_query($koneksi, "SELECT COUNT(id_inventaris) AS total_hilang FROM inventaris WHERE ruangan_id = '$id_ruangan' AND kondisi = 'hilang'");
+$d_stat_hilang = mysqli_fetch_assoc($q_stat_hilang);
+$total_hilang = $d_stat_hilang['total_hilang'] ?? 0;
 
 // 5. Data Pilihan Nama Barang untuk Dropdown Filter
 $q_filter_barang = mysqli_query($koneksi, "
@@ -193,22 +262,30 @@ $q_list = mysqli_query($koneksi, $sql_list);
                 </a>
             </div>
 
-            <div class="card-stats-grid">
+            <div class="card-stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
                 <div class="stat-card">
-                    <p>Jenis Barang</p>
-                    <h2 id="stat-jenis"><?= $total_jenis; ?></h2>
-                </div>
-                <div class="stat-card">
-                    <p>Total Satuan</p>
-                    <h2 id="stat-satuan"><?= $total_satuan; ?></h2>
+                    <p>Total Barang</p>
+                    <h2 id="stat-total"><?= $total_barang; ?></h2>
                 </div>
                 <div class="stat-card good">
-                    <p>Kondisi Baik</p>
-                    <h2 id="stat-baik"><?= $total_baik; ?></h2>
+                    <p>Baik</p>
+                    <h2 id="stat-baik" style="color: #15803d;"><?= $total_baik; ?></h2>
                 </div>
                 <div class="stat-card warning">
-                    <p>Perlu Perhatian</p>
-                    <h2 id="stat-perhatian"><?= $total_perhatian; ?></h2>
+                    <p>Cukup Baik</p>
+                    <h2 id="stat-cukup" style="color: #b45309;"><?= $total_cukup; ?></h2>
+                </div>
+                <div class="stat-card warning">
+                    <p>Rusak</p>
+                    <h2 id="stat-rusak" style="color: #c2410c;"><?= $total_rusak; ?></h2>
+                </div>
+                <div class="stat-card danger">
+                    <p>Rusak Parah</p>
+                    <h2 id="stat-rusak-parah" style="color: #b91c1c;"><?= $total_rusak_parah; ?></h2>
+                </div>
+                <div class="stat-card danger">
+                    <p>Hilang</p>
+                    <h2 id="stat-hilang" style="color: #111827;"><?= $total_hilang; ?></h2>
                 </div>
             </div>
 
@@ -370,7 +447,6 @@ $q_list = mysqli_query($koneksi, $sql_list);
             }, 500);
         }
 
-        // 3. Save Kondisi Inline via AJAX
         function saveConditionInline(id_inventaris, selectElement) {
             var formData = new FormData();
             formData.append('id_inventaris', id_inventaris);
@@ -391,8 +467,17 @@ $q_list = mysqli_query($koneksi, $sql_list);
                     if (data.total_baik !== undefined) {
                         document.getElementById('stat-baik').textContent = data.total_baik;
                     }
-                    if (data.total_perhatian !== undefined) {
-                        document.getElementById('stat-perhatian').textContent = data.total_perhatian;
+                    if (data.total_cukup !== undefined) {
+                        document.getElementById('stat-cukup').textContent = data.total_cukup;
+                    }
+                    if (data.total_rusak !== undefined) {
+                        document.getElementById('stat-rusak').textContent = data.total_rusak;
+                    }
+                    if (data.total_rusak_parah !== undefined) {
+                        document.getElementById('stat-rusak-parah').textContent = data.total_rusak_parah;
+                    }
+                    if (data.total_hilang !== undefined) {
+                        document.getElementById('stat-hilang').textContent = data.total_hilang;
                     }
                 } else {
                     alert(data.message || 'Gagal menyimpan kondisi.');
@@ -466,6 +551,10 @@ $q_list = mysqli_query($koneksi, $sql_list);
         }
 
         function getQrDataUrl(code) {
+            if (typeof QRCode === 'undefined') {
+                return '';
+            }
+
             var tempContainer = document.createElement('div');
             tempContainer.style.position = 'absolute';
             tempContainer.style.left = '-9999px';
@@ -551,14 +640,18 @@ $q_list = mysqli_query($koneksi, $sql_list);
             document.querySelectorAll('.qr-code').forEach(function(container) {
                 var code = container.dataset.barcode || '';
                 if (code && container.children.length === 0) {
-                    new QRCode(container, {
-                        text: code,
-                        width: 64,
-                        height: 64,
-                        colorDark: '#0f172a',
-                        colorLight: '#ffffff',
-                        correctLevel: QRCode.CorrectLevel.H
-                    });
+                    if (typeof QRCode !== 'undefined') {
+                        new QRCode(container, {
+                            text: code,
+                            width: 64,
+                            height: 64,
+                            colorDark: '#0f172a',
+                            colorLight: '#ffffff',
+                            correctLevel: QRCode.CorrectLevel.H
+                        });
+                    } else {
+                        container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;width:64px;height:64px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;font-size:11px;text-align:center;">QR</div>';
+                    }
                 }
             });
         }

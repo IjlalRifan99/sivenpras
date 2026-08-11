@@ -10,8 +10,7 @@ if (!isset($breadcrumb)) $breadcrumb = 'Dashboard';
     <title>SIVENPRAS - <?= htmlspecialchars($page_title); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/main.css">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
 <body>
 
@@ -26,7 +25,7 @@ if (!isset($breadcrumb)) $breadcrumb = 'Dashboard';
         <div class="topbar-actions">
             <?php if (($active_page ?? '') !== 'ruangan' && ($active_page ?? '') !== 'tambah'): ?>
                 <a href="tambah-barang.php" class="btn-primary" style="text-decoration: none;">
-                    <i class="ph-bold ph-plus"></i>
+                    <i class="bi bi-plus-lg"></i>
                     Tambah Barang
                 </a>
             <?php endif; ?>

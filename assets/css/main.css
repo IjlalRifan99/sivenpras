@@ -397,13 +397,22 @@ td {
     margin-left: 10px;
 }
 
+.room-dropdown {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 0 0 auto;
+}
+
 .room-dropdown-content {
     width: 100%;
-    max-height: 150px;
-    overflow-y: auto;
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
     overflow-x: hidden;
     margin-top: 4px;
-    scrollbar-width: none;
+    padding-right: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.14);
 }
 
 .room-dropdown-content::-webkit-scrollbar {
