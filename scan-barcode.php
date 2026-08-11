@@ -485,9 +485,31 @@ include 'includes/header.php';
         stopCameraBtn.style.display = 'none';
     }
 
+    async function getCameraStream() {
+        const candidates = [
+            { video: { facingMode: 'environment' }, audio: false },
+            { video: { facingMode: 'user' }, audio: false },
+            { video: true, audio: false }
+        ];
+
+        for (const constraints of candidates) {
+            try {
+                const tempStream = await navigator.mediaDevices.getUserMedia(constraints);
+                return tempStream;
+            } catch (error) {
+                if (error && error.name === 'OverconstrainedError') {
+                    continue;
+                }
+                throw error;
+            }
+        }
+
+        throw new Error('No camera constraints available');
+    }
+
     async function startCamera() {
         if (!window.isSecureContext) {
-            showCameraMessage('Untuk scan barcode dari handphone via IP, gunakan koneksi HTTPS atau buka dari localhost. Kamera tidak bisa aktif di origin tidak aman.');
+            showCameraMessage('Kamera belum bisa diakses. Pastikan HTTPS valid, sertifikat browser dipercaya, lalu tap tombol Aktifkan Kamera lagi.');
             return;
         }
 
@@ -501,13 +523,7 @@ include 'includes/header.php';
         }
 
         try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: { ideal: 'environment' },
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                }
-            });
+            stream = await getCameraStream();
 
             video.srcObject = stream;
             video.style.display = 'block';
@@ -520,8 +536,8 @@ include 'includes/header.php';
             detectionLoop = requestAnimationFrame(startDetectionLoop);
         } catch (error) {
             const message = (error && error.name === 'NotAllowedError')
-                ? 'Izin kamera ditolak. Izinkan akses kamera di browser lalu coba lagi.'
-                : 'Kamera tidak bisa diakses di perangkat ini. Anda tetap bisa memasukkan barcode secara manual.';
+                ? 'Kamera belum bisa diakses. Izinkan akses kamera di browser dan coba lagi dengan menekan tombol Aktifkan Kamera.'
+                : 'Kamera belum bisa diakses. Pastikan sertifikat HTTPS valid dan browser mengizinkan kamera. Anda tetap bisa memasukan barcode secara manual.';
             showCameraMessage(message);
         }
     }
