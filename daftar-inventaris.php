@@ -7,6 +7,56 @@ if (!isset($_SESSION['login'])) {
     exit;
 }
 
+// --- LOGIKA AJAX KELOLA GAMBAR (UPLOAD, EDIT, HAPUS) ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_gambar'])) {
+    $id_barang = (int)$_POST['id_barang'];
+    $action = $_POST['action_gambar'];
+
+    if ($action === 'upload' || $action === 'edit') {
+        if (isset($_FILES['gambar_file']) && $_FILES['gambar_file']['error'] === 0) {
+            $fileName = $_FILES['gambar_file']['name'];
+            $fileTmp  = $_FILES['gambar_file']['tmp_name'];
+            $ext      = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+            $allowed  = ['jpg', 'jpeg', 'png', 'webp'];
+
+            if (in_array($ext, $allowed)) {
+                // Hapus file lama dari server jika ada
+                $q_old = mysqli_query($koneksi, "SELECT gambar FROM barang WHERE id_barang = '$id_barang'");
+                $d_old = mysqli_fetch_assoc($q_old);
+                if (!empty($d_old['gambar']) && file_exists('uploads/barang/' . $d_old['gambar'])) {
+                    unlink('uploads/barang/' . $d_old['gambar']);
+                }
+
+                $newFileName = 'img_' . $id_barang . '_' . time() . '.' . $ext;
+                $targetDir   = 'uploads/barang/';
+                
+                if (!is_dir($targetDir)) {
+                    mkdir($targetDir, 0777, true);
+                }
+
+                if (move_uploaded_file($fileTmp, $targetDir . $newFileName)) {
+                    mysqli_query($koneksi, "UPDATE barang SET gambar = '$newFileName' WHERE id_barang = '$id_barang'");
+                    echo json_encode(['status' => 'success', 'gambar' => $newFileName]);
+                    exit;
+                }
+            }
+        }
+        echo json_encode(['status' => 'error', 'message' => 'Gagal mengunggah gambar.']);
+        exit;
+    }
+
+    if ($action === 'delete') {
+        $q_old = mysqli_query($koneksi, "SELECT gambar FROM barang WHERE id_barang = '$id_barang'");
+        $d_old = mysqli_fetch_assoc($q_old);
+        if (!empty($d_old['gambar']) && file_exists('uploads/barang/' . $d_old['gambar'])) {
+            unlink('uploads/barang/' . $d_old['gambar']);
+        }
+        mysqli_query($koneksi, "UPDATE barang SET gambar = NULL WHERE id_barang = '$id_barang'");
+        echo json_encode(['status' => 'success']);
+        exit;
+    }
+}
+
 $active_page = 'inventaris';
 $page_title = 'inventaris';
 $breadcrumb = 'Inventaris';
@@ -41,6 +91,7 @@ $query = "
         b.id_barang,
         b.nama_barang,
         b.deskripsi,
+        b.gambar,
         k.nama_kategori,
         GROUP_CONCAT(DISTINCT r.nama_ruangan SEPARATOR ', ') AS lokasi,
         COUNT(i.id_inventaris) AS jumlah_unit,
@@ -72,11 +123,12 @@ if ($q_ruangan) {
     }
 }
 
-// Query Detail Unit Inventaris per Barang
-    $detail_query = "
+// Query Detail Unit Inventaris per Barang (termasuk foto & kategori)
+$detail_query = "
     SELECT 
         b.id_barang,
         b.nama_barang,
+        b.gambar,
         k.nama_kategori,
         i.barcode,
         i.kondisi,
@@ -158,7 +210,6 @@ if ($q_detail_units) {
             <thead>
                 <tr>
                     <th>NO</th>
-                    <th>ID</th>
                     <th>NAMA BARANG</th>
                     <th>KATEGORI</th>
                     <th>KONDISI</th>
@@ -183,7 +234,6 @@ if ($q_detail_units) {
                         ?>
                         <tr>
                             <td style="font-weight: 500; color: #64748b;"><?= $no++; ?></td>
-                            <td style="font-weight: 700; color: #0f172a;"><?= htmlspecialchars($row['id_barang']); ?></td>
                             <td>
                                 <strong style="display: block; color: #1e293b;"><?= htmlspecialchars($row['nama_barang']); ?></strong>
                                 <small style="color: #94a3b8;"><?= htmlspecialchars($row['deskripsi']); ?></small>
@@ -195,8 +245,11 @@ if ($q_detail_units) {
                             </td>
                             <td style="font-weight: 600; color: #0f172a;">
                                 <?= number_format($row['jumlah_unit']); ?>
-                                <button type="button" class="btn-view-units" data-barang-id="<?= $row['id_barang']; ?>"
-                                    data-barang-nama="<?= htmlspecialchars($row['nama_barang'], ENT_QUOTES, 'UTF-8'); ?>">
+                                <button type="button" class="btn-view-units" 
+                                    data-barang-id="<?= $row['id_barang']; ?>"
+                                    data-barang-nama="<?= htmlspecialchars($row['nama_barang'], ENT_QUOTES, 'UTF-8'); ?>"
+                                    data-barang-kategori="<?= htmlspecialchars($row['nama_kategori'] ?? '-', ENT_QUOTES, 'UTF-8'); ?>"
+                                    data-barang-gambar="<?= htmlspecialchars($row['gambar'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                                     Detail
                                 </button>
                             </td>
@@ -205,7 +258,7 @@ if ($q_detail_units) {
                         <?php
                     }
                 } else {
-                    echo "<tr><td colspan='7' style='text-align: center; padding: 30px; color: #94a3b8;'>Tidak ada data barang.</td></tr>";
+                    echo "<tr><td colspan='6' style='text-align: center; padding: 30px; color: #94a3b8;'>Tidak ada data barang.</td></tr>";
                 }
                 ?>
             </tbody>
@@ -214,49 +267,49 @@ if ($q_detail_units) {
 </div>
 </main>
 
+<!-- MODAL DETAIL BARANG -->
 <div id="simpleModal" class="modal-backdrop">
-    <div class="modal-content-panel">
+    <div class="modal-card">
+        <!-- Header -->
+        <div class="modal-header">
+            <span class="modal-title">Detail Barang</span>
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+        </div>
 
-        <div class="modal-header-custom">
-            <div>
-                <h3 id="modalTitle" class="modal-title-custom">Detail Unit Barang</h3>
-                <strong id="modalNamaBarang" style="display: block; font-size: 16px; color: #0f172a; margin-top: 2px;"></strong>
-                <span id="modalSubtitle" class="modal-subtitle-custom"></span>
+        <!-- Body -->
+        <div class="modal-body">
+            <!-- Dynamic Photo Container -->
+            <div id="photoAreaContainer" style="margin-bottom: 20px;"></div>
+            
+            <!-- Hidden File Input for Dynamic Upload -->
+            <input type="file" id="imageFileInput" accept="image/*" style="display: none;">
+
+            <!-- Info Utama -->
+            <div class="info-row">
+                <span class="info-label">Nama Barang</span>
+                <span class="info-separator">:</span>
+                <span id="modalInfoNama" class="info-value">-</span>
             </div>
-            <button type="button" onclick="closeModal()" class="btn-close-icon">&times;</button>
-        </div>
+            <div class="info-row">
+                <span class="info-label">Kategori</span>
+                <span class="info-separator">:</span>
+                <span id="modalInfoKategori" class="info-value">-</span>
+            </div>
 
-        <div class="modal-filter-row">
-            <label for="modalKondisiFilter">Filter Kondisi</label>
-            <select id="modalKondisiFilter" class="filter-select">
-                <option value="">Semua Kondisi</option>
-                <option value="baik">Baik</option>
-                <option value="cukup baik">Cukup Baik</option>
-                <option value="rusak">Rusak</option>
-                <option value="rusak parah">Rusak Parah</option>
-                <option value="hilang">Hilang</option>
-            </select>
-        </div>
-
-        <div class="modal-body-scroll">
-            <table class="modal-table">
-                <thead>
-                    <tr>
-                        <th style="width: 40px;">NO</th>
-                        <th>CODE BARANG</th>
-                        <th>NAMA BARANG</th>
-                        <th>RUANGAN</th>
-                        <th>KONDISI</th>
-                        <th>KETERANGAN</th>
-                    </tr>
-                </thead>
-                <tbody id="modalBody">
-                </tbody>
-            </table>
-        </div>
-
-        <div class="modal-footer-custom">
-            <button type="button" onclick="closeModal()" class="btn-close-modal">Tutup</button>
+            <!-- Tabel Unit -->
+            <div class="modal-table-scroll">
+                <table class="detail-table">
+                    <thead>
+                        <tr>
+                            <th>Kode</th>
+                            <th>Kondisi</th>
+                            <th>Ruangan</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalBody">
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
@@ -300,192 +353,7 @@ if ($q_detail_units) {
 </div>
 
 <style>
-    /* --- ACTION BAR --- */
-    .action-bar {
-        display: flex;
-        gap: 12px;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-    }
-
-    .btn-export-excel {
-        padding: 12px 20px;
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 6px rgba(59, 130, 246, 0.25);
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .btn-export-excel:hover {
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-        box-shadow: 0 6px 12px rgba(59, 130, 246, 0.35);
-        transform: translateY(-2px);
-    }
-
-    .btn-export-excel:active {
-        transform: translateY(0);
-    }
-
-    /* --- CHECKBOX LIST --- */
-    .checkbox-list {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        padding: 0 20px;
-    }
-
-    .checkbox-item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 12px 14px;
-        border-radius: 8px;
-        transition: all 0.2s ease;
-        border: 1px solid transparent;
-    }
-
-    .checkbox-item:hover {
-        background: #f0f9ff;
-        border-color: #3b82f6;
-    }
-
-    .checkbox-item input[type="checkbox"] {
-        cursor: pointer;
-        width: 18px;
-        height: 18px;
-        accent-color: #3b82f6;
-    }
-
-    .checkbox-item label {
-        cursor: pointer;
-        font-size: 14px;
-        color: #334155;
-        flex: 1;
-        font-weight: 500;
-    }
-
-    /* --- FITUR FILTER BAR --- */
-    .filter-bar {
-        display: flex;
-        gap: 12px;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-    }
-
-    .filter-input-wrapper {
-        flex: 1;
-        min-width: 250px;
-    }
-
-    .filter-input {
-        width: 100%;
-        padding: 10px 14px;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        font-size: 14px;
-        outline: none;
-        transition: border-color 0.2s;
-    }
-
-    .filter-input:focus {
-        border-color: #0d9488;
-    }
-
-    .filter-select {
-        padding: 10px 14px;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        font-size: 14px;
-        background-color: #fff;
-        outline: none;
-        cursor: pointer;
-    }
-
-    .btn-reset {
-        padding: 10px 14px;
-        background: #e2e8f0;
-        color: #334155;
-        text-decoration: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 500;
-    }
-
-    /* --- TABEL DATA --- */
-    .table-wrapper {
-        padding: 0;
-        overflow-x: auto;
-    }
-
-    .custom-table {
-        width: 100%;
-        border-collapse: collapse;
-        text-align: left;
-        font-size: 14px;
-    }
-
-    .custom-table thead tr {
-        background: #f8fafc;
-        border-bottom: 1px solid #e2e8f0;
-        color: #64748b;
-    }
-
-    .custom-table th,
-    .custom-table td {
-        padding: 14px 18px;
-    }
-
-    .custom-table tbody tr {
-        border-bottom: 1px solid #f1f5f9;
-    }
-
-    .btn-view-units {
-        margin-left: 8px;
-        padding: 5px 12px;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        background: #fff;
-        font-size: 12px;
-        cursor: pointer;
-        font-weight: 500;
-        color: #0f172a;
-        transition: all 0.2s;
-    }
-
-    .btn-view-units:hover {
-        background: #f1f5f9;
-        border-color: #94a3b8;
-    }
-
-    .dot {
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        margin-right: 5px;
-    }
-
-    .dot.green {
-        background-color: #22c55e;
-    }
-
-    .dot.yellow {
-        background-color: #eab308;
-    }
-
-    .dot.red {
-        background-color: #ef4444;
-    }
-
-    /* --- MODAL POPUP --- */
+    /* --- STYLE MODAL SESUAI WIREFRAME --- */
     .modal-backdrop {
         display: none;
         position: fixed;
@@ -493,138 +361,202 @@ if ($q_detail_units) {
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(15, 23, 42, 0.5);
-        backdrop-filter: blur(2px);
+        background: rgba(0, 0, 0, 0.4);
         z-index: 9999;
         align-items: center;
         justify-content: center;
     }
 
-    /* Tampil saat Javascript menambahkan class 'show' */
     .modal-backdrop.show {
         display: flex !important;
     }
 
-    .modal-content-panel {
-        background: #ffffff;
-        width: 90%;
-        max-width: 650px;
-        border-radius: 12px;
-        padding: 24px;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-        position: relative;
-        max-height: 85vh;
-        display: flex;
-        flex-direction: column;
+    .modal-card {
+        width: 380px;
+        max-width: 90%;
+        background-color: #f8f8f8;
+        border: 1px solid #333;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
 
-    .modal-header-custom {
+    .modal-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        border-bottom: 1px solid #e2e8f0;
-        padding-bottom: 12px;
-        margin-bottom: 16px;
+        padding: 12px 16px;
+        border-bottom: 2px solid #333;
+        background-color: #f8f8f8;
     }
 
-    .modal-title-custom {
-        margin: 0;
-        font-size: 18px;
-        color: #0f172a;
+    .modal-title {
+        font-weight: bold;
+        font-size: 16px;
+        color: #000;
     }
 
-    .modal-subtitle-custom {
-        font-size: 13px;
-        color: #64748b;
-    }
-
-    .btn-close-icon {
-        background: transparent;
-        border: none;
-        font-size: 24px;
-        color: #64748b;
+    .close-btn {
         cursor: pointer;
+        font-size: 18px;
+        font-weight: bold;
+        color: #000;
         line-height: 1;
     }
 
-    .modal-body-scroll {
-        overflow-y: auto;
-        flex: 1;
+    .modal-body {
+        padding: 20px 16px;
     }
 
-    .modal-filter-row {
+    /* CSS Foto, Tambah Gambar, Hover, Edit & Hapus */
+    .btn-add-photo {
+        width: 60%;
+        height: 120px;
+        border: 1px dashed #666;
         display: flex;
+        justify-content: center;
         align-items: center;
-        gap: 12px;
-        margin-bottom: 16px;
+        margin: 0 auto;
+        color: #333;
+        font-size: 14px;
+        background-color: #fff;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    .btn-add-photo:hover {
+        background-color: #f0f0f0;
     }
 
-    .modal-filter-row label {
-        font-size: 13px;
-        color: #475569;
-        font-weight: 600;
-        min-width: 110px;
+    .photo-preview-wrapper {
+        position: relative;
+        width: 60%;
+        height: 120px;
+        border: 1px dashed #666;
+        margin: 0 auto;
+        background-color: #000;
+        overflow: hidden;
     }
 
-    .modal-table {
+    .photo-preview-wrapper img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .photo-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.65);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+    }
+
+    .photo-preview-wrapper:hover .photo-overlay {
+        opacity: 1;
+    }
+
+    .btn-overlay {
+        padding: 4px 10px;
+        border: none;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .btn-overlay-edit {
+        background: #3b82f6;
+        color: #fff;
+    }
+
+    .btn-overlay-delete {
+        background: #ef4444;
+        color: #fff;
+    }
+
+    .info-row {
+        display: flex;
+        margin-bottom: 8px;
+        font-size: 14px;
+        color: #000;
+    }
+
+    .info-label {
+        width: 110px;
+    }
+
+    .info-separator {
+        margin-right: 8px;
+    }
+
+    .info-value {
+        font-weight: 500;
+    }
+
+    .modal-table-scroll {
+        max-height: 180px;
+        overflow-y: auto;
+        margin-top: 16px;
+    }
+
+    .detail-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 13px;
-        text-align: left;
-    }
-
-    .modal-table thead tr {
-        background: #f1f5f9;
-        color: #475569;
-    }
-
-    .modal-table th,
-    .modal-table td {
-        padding: 10px;
-        border-bottom: 1px solid #e2e8f0;
-    }
-
-    .modal-footer-custom {
-        margin-top: 20px;
-        text-align: right;
-        border-top: 1px solid #e2e8f0;
-        padding-top: 16px;
-        display: flex;
-        gap: 10px;
-        justify-content: flex-end;
-    }
-
-    .btn-close-modal {
-        padding: 10px 18px;
-        background: #e2e8f0;
-        color: #334155;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
         font-size: 14px;
-        font-weight: 600;
-        transition: all 0.2s ease;
+        text-align: left;
+        color: #000;
     }
 
-    .btn-close-modal:hover {
-        background: #cbd5e1;
-        transform: translateY(-2px);
+    .detail-table th {
+        font-weight: bold;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #ccc;
     }
 
-    .modal-footer-custom button[type="submit"] {
-        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-        color: #fff;
-        box-shadow: 0 4px 6px rgba(34, 197, 94, 0.25);
+    .detail-table td {
+        padding: 6px 0;
     }
 
-    .modal-footer-custom button[type="submit"]:hover {
-        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-        box-shadow: 0 6px 12px rgba(34, 197, 94, 0.35);
-    }
+    /* --- OTHER STYLES --- */
+    .action-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .btn-export-excel { padding: 12px 20px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .checkbox-list { display: flex; flex-direction: column; gap: 4px; padding: 0 20px; }
+    .checkbox-item { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 8px; }
+    .filter-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .filter-input-wrapper { flex: 1; min-width: 250px; }
+    .filter-input { width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
+    .filter-select { padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background-color: #fff; }
+    .btn-reset { padding: 10px 14px; background: #e2e8f0; color: #334155; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500; }
+    .table-wrapper { padding: 0; overflow-x: auto; }
+    .custom-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+    .custom-table thead tr { background: #f8fafc; border-bottom: 1px solid #e2e8f0; color: #64748b; }
+    .custom-table th, .custom-table td { padding: 14px 18px; }
+    .custom-table tbody tr { border-bottom: 1px solid #f1f5f9; }
+    .btn-view-units { margin-left: 8px; padding: 5px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; font-size: 12px; cursor: pointer; color: #0f172a; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+    .dot.green { background-color: #22c55e; }
+    .dot.yellow { background-color: #eab308; }
+    .dot.red { background-color: #ef4444; }
+
+    .modal-content-panel { background: #ffffff; width: 90%; max-width: 650px; border-radius: 12px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); position: relative; max-height: 85vh; display: flex; flex-direction: column; }
+    .modal-header-custom { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px; }
+    .modal-title-custom { margin: 0; font-size: 18px; color: #0f172a; }
+    .modal-subtitle-custom { font-size: 13px; color: #64748b; }
+    .btn-close-icon { background: transparent; border: none; font-size: 24px; color: #64748b; cursor: pointer; }
+    .modal-body-scroll { overflow-y: auto; flex: 1; }
+    .modal-footer-custom { margin-top: 20px; text-align: right; border-top: 1px solid #e2e8f0; padding-top: 16px; display: flex; gap: 10px; justify-content: flex-end; }
+    .btn-close-modal { padding: 10px 18px; background: #e2e8f0; color: #334155; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
 </style>
 
 <script>
     const detailUnits = <?= json_encode($detail_units_by_barang, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    let currentBarangId = null;
+    let currentGambar = '';
 
     function escapeHtml(text) {
         return String(text ?? '')
@@ -635,110 +567,121 @@ if ($q_detail_units) {
             .replace(/'/g, '&#39;');
     }
 
-    function getFilterLabel(filter) {
-        switch ((filter || '').toLowerCase().trim()) {
-            case 'baik':
-                return 'Total Baik';
-            case 'cukup baik':
-                return 'Total Cukup Baik';
-            case 'rusak':
-                return 'Total Rusak';
-            case 'rusak parah':
-                return 'Total Rusak Parah';
-            case 'hilang':
-                return 'Total Hilang';
-            default:
-                return 'Total';
+    function capitalizeFirstLetter(string) {
+        if (!string) return '-';
+        return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+
+    function renderPhotoArea() {
+        const container = document.getElementById('photoAreaContainer');
+        if (currentGambar && currentGambar.trim() !== '') {
+            container.innerHTML = `
+                <div class="photo-preview-wrapper">
+                    <img src="uploads/barang/${escapeHtml(currentGambar)}" alt="Foto Barang">
+                    <div class="photo-overlay">
+                        <button class="btn-overlay btn-overlay-edit" onclick="triggerFileInput()">Edit</button>
+                        <button class="btn-overlay btn-overlay-delete" onclick="handleDeleteGambar()">Hapus</button>
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <button class="btn-add-photo" onclick="triggerFileInput()">
+                    <span>➕ Tambah Gambar</span>
+                </button>
+            `;
         }
     }
 
-    function renderModalRows(units, kondisiFilter, barangNama, barangId) {
-        const body = document.getElementById('modalBody');
-        const subtitle = document.getElementById('modalSubtitle');
-        const filter = (kondisiFilter || '').toLowerCase().trim();
-        const filtered = units.filter(function (unit) {
-            if (!filter) return true;
-            return String(unit.kondisi || '').toLowerCase().trim() === filter;
-        });
+    function triggerFileInput() {
+        document.getElementById('imageFileInput').click();
+    }
 
-        if (filtered.length > 0) {
-            body.innerHTML = filtered.map(function (unit, index) {
+    function handleDeleteGambar() {
+        if (confirm('Apakah Anda yakin ingin menghapus gambar ini?')) {
+            const formData = new FormData();
+            formData.append('id_barang', currentBarangId);
+            formData.append('action_gambar', 'delete');
+
+            fetch('daftar-inventaris.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    currentGambar = '';
+                    renderPhotoArea();
+                    updateButtonDataAttribute(currentBarangId, '');
+                } else {
+                    alert('Gagal menghapus gambar.');
+                }
+            })
+            .catch(() => alert('Terjadi kesalahan koneksi.'));
+        }
+    }
+
+    function updateButtonDataAttribute(barangId, newGambar) {
+        const btn = document.querySelector(`.btn-view-units[data-barang-id="${barangId}"]`);
+        if (btn) {
+            btn.setAttribute('data-barang-gambar', newGambar);
+        }
+    }
+
+    function openModal(barangId, barangNama, barangKategori, barangGambar) {
+        const modal = document.getElementById('simpleModal');
+        const infoNama = document.getElementById('modalInfoNama');
+        const infoKategori = document.getElementById('modalInfoKategori');
+        const modalBody = document.getElementById('modalBody');
+
+        currentBarangId = barangId;
+        currentGambar = barangGambar || '';
+
+        // Render Photo Area (Tambah Gambar vs Hover Overlay)
+        renderPhotoArea();
+
+        // Render Meta Info
+        infoNama.textContent = barangNama || '-';
+        infoKategori.textContent = barangKategori || '-';
+
+        // Render Tabel Unit
+        const units = detailUnits[barangId] || [];
+        if (units.length > 0) {
+            modalBody.innerHTML = units.map(function (unit) {
                 return `
-                <tr>
-                    <td style="color: #64748b;">${index + 1}</td>
-                    <td style="font-weight: 600; color: #0f172a;">${escapeHtml(unit.barcode || '-')}</td>
-                    <td style="color: #1e293b; font-weight: 500;">${escapeHtml(unit.nama_barang || barangNama || '-')}</td>
-                    <td style="color: #334155;">${escapeHtml(unit.nama_ruangan || '-')}</td>
-                    <td style="text-transform: capitalize;">${escapeHtml(unit.kondisi || '-')}</td>
-                    <td style="color: #475569;">${escapeHtml(unit.keterangan || '-')}</td>
-                </tr>
-            `;
+                    <tr>
+                        <td>${escapeHtml(unit.barcode || '-')}</td>
+                        <td>${escapeHtml(capitalizeFirstLetter(unit.kondisi))}</td>
+                        <td>${escapeHtml(unit.nama_ruangan || '-')}</td>
+                    </tr>
+                `;
             }).join('');
         } else {
-            body.innerHTML = `
-            <tr>
-                <td colspan="6" style="padding: 20px; text-align: center; color: #94a3b8;">
-                    Tidak ada unit dengan kondisi terpilih.
-                </td>
-            </tr>
-        `;
+            modalBody.innerHTML = `
+                <tr>
+                    <td colspan="3" style="text-align: center; padding: 10px; color: #888;">
+                        Belum ada unit tercatat.
+                    </td>
+                </tr>
+            `;
         }
 
-        if (subtitle) {
-            subtitle.textContent = `ID: ${barangId} | ${getFilterLabel(filter)}: ${filtered.length} unit`;
-        }
-    }
-
-    function openModal(barangId, barangNama, barangKode) {
-        const modal = document.getElementById('simpleModal');
-        const title = document.getElementById('modalTitle');
-        const namaBarangEl = document.getElementById('modalNamaBarang');
-        const kondisiFilterEl = document.getElementById('modalKondisiFilter');
-        const units = detailUnits[barangId] || [];
-
-        // Simpan barangId dan barangKode pada modal untuk filter
-        if (modal) {
-            modal.dataset.barangId = barangId;
-            modal.dataset.barangKode = barangKode;
-        }
-
-        // Set Judul Modal
-        title.textContent = 'Detail Unit Barang';
-
-        // Set Nama Barang di Header Modal
-        if (namaBarangEl) {
-            namaBarangEl.textContent = barangNama || '-';
-        }
-
-        if (kondisiFilterEl) {
-            kondisiFilterEl.value = '';
-        }
-
-        renderModalRows(units, '', barangNama, barangKode);
-
-        modal.classList.add('show');
+        if (modal) modal.classList.add('show');
     }
 
     function closeModal() {
         const modal = document.getElementById('simpleModal');
-        if (modal) {
-            modal.classList.remove('show');
-            delete modal.dataset.barangId;
-        }
+        if (modal) modal.classList.remove('show');
     }
 
     function openExportModal() {
         const modal = document.getElementById('exportModal');
-        if (modal) {
-            modal.classList.add('show');
-        }
+        if (modal) modal.classList.add('show');
     }
 
     function closeExportModal() {
         const modal = document.getElementById('exportModal');
-        if (modal) {
-            modal.classList.remove('show');
-        }
+        if (modal) modal.classList.remove('show');
     }
 
     function toggleAllRuangan(checkbox) {
@@ -759,7 +702,6 @@ if ($q_detail_units) {
             return false;
         }
 
-        // Disable tombol dan ubah text saat proses
         const submitBtn = document.querySelector('#exportForm button[type="submit"]');
         if (submitBtn) {
             submitBtn.disabled = true;
@@ -772,34 +714,52 @@ if ($q_detail_units) {
 
     document.addEventListener('DOMContentLoaded', function () {
         const buttons = document.querySelectorAll('.btn-view-units');
-        const kondisiFilterEl = document.getElementById('modalKondisiFilter');
 
         buttons.forEach(function (btn) {
             btn.addEventListener('click', function () {
                 const barangId = this.getAttribute('data-barang-id');
                 const barangNama = this.getAttribute('data-barang-nama');
+                const barangKategori = this.getAttribute('data-barang-kategori');
+                const barangGambar = this.getAttribute('data-barang-gambar');
 
-                openModal(barangId, barangNama);
+                openModal(barangId, barangNama, barangKategori, barangGambar);
             });
         });
 
-        if (kondisiFilterEl) {
-            kondisiFilterEl.addEventListener('change', function () {
-                const modal = document.getElementById('simpleModal');
-                if (!modal.classList.contains('show')) return;
+        // Event listener Upload / Edit Gambar via input file
+        document.getElementById('imageFileInput').addEventListener('change', function () {
+            if (this.files && this.files[0]) {
+                const formData = new FormData();
+                formData.append('id_barang', currentBarangId);
+                formData.append('action_gambar', currentGambar ? 'edit' : 'upload');
+                formData.append('gambar_file', this.files[0]);
 
-                const barangId = modal.dataset.barangId;
-                const barangNama = document.getElementById('modalNamaBarang').textContent;
-                const units = detailUnits[barangId] || [];
-                renderModalRows(units, this.value, barangNama, barangId);
-            });
-        }
+                fetch('daftar-inventaris.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        currentGambar = data.gambar;
+                        renderPhotoArea();
+                        updateButtonDataAttribute(currentBarangId, data.gambar);
+                    } else {
+                        alert(data.message || 'Gagal mengunggah gambar.');
+                    }
+                })
+                .catch(() => alert('Terjadi kesalahan koneksi.'));
+                
+                this.value = '';
+            }
+        });
 
         const modal = document.getElementById('simpleModal');
+        const exportModal = document.getElementById('exportModal');
+
         window.addEventListener('click', function (e) {
-            if (e.target === modal) {
-                closeModal();
-            }
+            if (e.target === modal) closeModal();
+            if (e.target === exportModal) closeExportModal();
         });
     });
 </script>

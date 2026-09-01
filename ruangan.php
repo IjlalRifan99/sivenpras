@@ -452,8 +452,8 @@ $q_list = mysqli_query($koneksi, $sql_list);
 <style>
     .btn-scroll-top {
     position: fixed;
-    bottom: 25px;
-    right: 25px;
+    bottom: 80px;
+    right: 30px;
     z-index: 999;
     display: none;
     border: none;
