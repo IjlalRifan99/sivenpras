@@ -64,6 +64,15 @@ $result_barang = mysqli_query($koneksi, $query);
 // Dropdown Kategori
 $q_filter_kategori = mysqli_query($koneksi, "SELECT * FROM kategori ORDER BY nama_kategori ASC");
 
+// Query Semua Ruangan untuk Export Modal
+$q_ruangan = mysqli_query($koneksi, "SELECT id_ruangan, nama_ruangan FROM ruangan ORDER BY nama_ruangan ASC");
+$ruangan_list = [];
+if ($q_ruangan) {
+    while ($ruang = mysqli_fetch_assoc($q_ruangan)) {
+        $ruangan_list[] = $ruang;
+    }
+}
+
 // Query Detail Unit Inventaris per Barang
 $detail_query = "
     SELECT 
@@ -114,6 +123,12 @@ if ($q_detail_units) {
         <p>Total <?= $result_barang ? mysqli_num_rows($result_barang) : 0; ?> jenis barang tercatat dalam sistem</p>
     </div>
 
+    <div class="action-bar">
+        <button type="button" class="btn-export-excel" onclick="openExportModal()">
+            📊 Export Excel
+        </button>
+    </div>
+
     <form method="GET" action="daftar-inventaris.php" class="filter-bar">
         <div class="filter-input-wrapper">
             <input type="text" name="search" class="filter-input" placeholder="Cari nama, kode, atau lokasi..."
@@ -151,7 +166,6 @@ if ($q_detail_units) {
                     <th>KONDISI</th>
                     <th>JUMLAH</th>
                     <th>LOKASI</th>
-                    <th style="text-align: center;">AKSI</th>
                 </tr>
             </thead>
 
@@ -190,12 +204,11 @@ if ($q_detail_units) {
                                 </button>
                             </td>
                             <td style="color: #475569;"><?= htmlspecialchars($row['lokasi'] ?? '-'); ?></td>
-                            <td style="text-align: center;">-</td>
                         </tr>
                         <?php
                     }
                 } else {
-                    echo "<tr><td colspan='8' style='text-align: center; padding: 30px; color: #94a3b8;'>Tidak ada data barang.</td></tr>";
+                    echo "<tr><td colspan='7' style='text-align: center; padding: 30px; color: #94a3b8;'>Tidak ada data barang.</td></tr>";
                 }
                 ?>
             </tbody>
@@ -251,7 +264,103 @@ if ($q_detail_units) {
     </div>
 </div>
 
+<!-- MODAL EXPORT EXCEL -->
+<div id="exportModal" class="modal-backdrop">
+    <div class="modal-content-panel">
+        <div class="modal-header-custom">
+            <div>
+                <h3 class="modal-title-custom">Export Excel Inventaris</h3>
+                <span class="modal-subtitle-custom">Pilih ruangan yang ingin diekspor</span>
+            </div>
+            <button type="button" onclick="closeExportModal()" class="btn-close-icon">&times;</button>
+        </div>
+
+        <form id="exportForm" method="POST" action="export-inventaris.php" onsubmit="return validateRuanganSelection()">
+            <div class="modal-body-scroll" style="padding: 20px 0;">
+                <div class="checkbox-list">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="selectAll" onchange="toggleAllRuangan(this)">
+                        <label for="selectAll" style="font-weight: 600;">Pilih Semua Ruangan</label>
+                    </div>
+                    <hr style="margin: 12px 0; border: none; border-top: 1px solid #e2e8f0;">
+                    
+                    <?php foreach ($ruangan_list as $ruang): ?>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="ruangan[]" value="<?= $ruang['id_ruangan']; ?>" 
+                                   class="ruangan-checkbox">
+                            <label><?= htmlspecialchars($ruang['nama_ruangan']); ?></label>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div class="modal-footer-custom">
+                <button type="button" onclick="closeExportModal()" class="btn-close-modal" style="background: #94a3b8;">Batal</button>
+                <button type="submit" class="btn-close-modal" style="background: #22c55e; margin-left: 8px;">Export</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <style>
+    /* --- ACTION BAR --- */
+    .action-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .btn-export-excel {
+        padding: 10px 16px;
+        background: #3b82f6;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .btn-export-excel:hover {
+        background: #2563eb;
+    }
+
+    /* --- CHECKBOX LIST --- */
+    .checkbox-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 0 20px;
+    }
+
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px;
+        border-radius: 6px;
+        transition: background 0.2s;
+    }
+
+    .checkbox-item:hover {
+        background: #f1f5f9;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+        cursor: pointer;
+        width: 18px;
+        height: 18px;
+    }
+
+    .checkbox-item label {
+        cursor: pointer;
+        font-size: 14px;
+        color: #334155;
+        flex: 1;
+    }
+
     /* --- FITUR FILTER BAR --- */
     .filter-bar {
         display: flex;
@@ -589,6 +698,49 @@ if ($q_detail_units) {
             modal.classList.remove('show');
             delete modal.dataset.barangId;
         }
+    }
+
+    function openExportModal() {
+        const modal = document.getElementById('exportModal');
+        if (modal) {
+            modal.classList.add('show');
+        }
+    }
+
+    function closeExportModal() {
+        const modal = document.getElementById('exportModal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+    }
+
+    function toggleAllRuangan(checkbox) {
+        const checkboxes = document.querySelectorAll('.ruangan-checkbox');
+        checkboxes.forEach(function (cb) {
+            cb.checked = checkbox.checked;
+        });
+    }
+
+    function validateRuanganSelection() {
+        const checkboxes = document.querySelectorAll('.ruangan-checkbox');
+        const isAnyChecked = Array.from(checkboxes).some(function (cb) {
+            return cb.checked;
+        });
+
+        if (!isAnyChecked) {
+            alert('Silakan pilih minimal satu ruangan untuk diekspor');
+            return false;
+        }
+
+        // Disable tombol dan ubah text saat proses
+        const submitBtn = document.querySelector('#exportForm button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Sedang mengekspor...';
+            submitBtn.style.opacity = '0.6';
+        }
+
+        return true;
     }
 
     document.addEventListener('DOMContentLoaded', function () {
