@@ -213,7 +213,7 @@ $q_ruangan  = mysqli_query($koneksi, "SELECT * FROM ruangan ORDER BY nama_ruanga
             </div>
 
             <div class="filter-actions">
-                <button type="submit" class="btn-filter">🔍 Filter</button>
+                <button type="submit" class="btn-filter">Filter</button>
                 <a href="laporan.php" class="btn-reset">Reset</a>
             </div>
 
@@ -221,10 +221,10 @@ $q_ruangan  = mysqli_query($koneksi, "SELECT * FROM ruangan ORDER BY nama_ruanga
 
         <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f1f5f9; display: flex; gap: 10px; justify-content: flex-end;">
             <a href="laporan.php?action=export_excel&kategori=<?= $kategori_id; ?>&ruangan=<?= $ruangan_id; ?>&kondisi=<?= $kondisi; ?>" class="btn-export-excel">
-                📊 Export Excel
+                Export Excel
             </a>
             <button onclick="window.print()" class="btn-print">
-                🖨️ Cetak / PDF
+                Cetak / PDF
             </button>
         </div>
     </div>
