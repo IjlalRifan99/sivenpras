@@ -239,7 +239,7 @@ function generateXLSXFile($data) {
     foreach ($headers as $idx => $header) {
         $sheet_xml .= '<c r="' . $col_letters[$idx] . '1" t="inlineStr" s="1"><is><t>' . htmlspecialchars($header) . '</t></is></c>';
     }
-    $sheet_xml .= '</row>';
+    $sheet_xml .= '</row>'; 
     
     // Data rows
     $row_num = 2;

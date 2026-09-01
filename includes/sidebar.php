@@ -28,6 +28,12 @@ $q_ruangan = mysqli_query($koneksi, "SELECT r.id_ruangan, r.nama_ruangan, COUNT(
             </div>
         </a>
 
+        <a href="daftar-barang.php" class="menu-item <?= ($active_page ?? '') == 'barang' ? 'active' : ''; ?>">
+            <div class="menu-left">
+                <i class="bi bi-box2-fill menu-icon"></i> Daftar Barang
+            </div>
+        </a>
+
         <a href="tambah-barang.php" class="menu-item <?= ($active_page ?? '') == 'tambah-barang' ? 'active' : ''; ?>">
             <div class="menu-left">
                 <i class="bi bi-plus-square-fill menu-icon"></i> Tambah Barang
@@ -45,6 +51,31 @@ $q_ruangan = mysqli_query($koneksi, "SELECT r.id_ruangan, r.nama_ruangan, COUNT(
         <a href="ruangan.php" class="menu-item <?= ($active_page ?? '') == 'ruangan' ? 'active' : ''; ?>">
             <div class="menu-left">
                 <i class="bi bi-building-fill menu-icon"></i> Ruangan
+            </div>
+        </a>
+
+        <a href="laporan.php" class="menu-item <?= ($active_page ?? '') == 'laporan' ? 'active' : ''; ?>">
+            <div class="menu-left">
+                <i class="bi bi-file-earmark-text menu-icon"></i> Laporan
+            </div>
+        </a>
+    </nav>
+
+    <nav class="sidebar-menu" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+        <div class="menu-label">Admin</div>
+        <a href="manajemen-user.php" class="menu-item <?= ($active_page ?? '') == 'user' ? 'active' : ''; ?>">
+            <div class="menu-left">
+                <i class="bi bi-people-fill menu-icon"></i> Manajemen User
+            </div>
+        </a>
+        <a href="manajemen-kategori.php" class="menu-item <?= ($active_page ?? '') == 'kategori' ? 'active' : ''; ?>">
+            <div class="menu-left">
+                <i class="bi bi-tags-fill menu-icon"></i> Manajemen Kategori
+            </div>
+        </a>
+        <a href="manajemen-ruangan.php" class="menu-item <?= ($active_page ?? '') == 'ruangan' ? 'active' : ''; ?>">
+            <div class="menu-left">
+                <i class="bi bi-building-fill menu-icon"></i> Manajemen Ruangan
             </div>
         </a>
     </nav>
