@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         body {
-            background-color: #92b1e4; /* Warna background biru pastel sesuai gambar */
+            background-color: #1e293b;
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -77,11 +77,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             align-items: center;
         }
 
+        .login-card img {
+            width: 110px;
+        }
+
         /* Circle Avatar Atas */
         .avatar-circle {
-            width: 90px;
-            height: 90px;
-            background-color: #4170c4;
+            width: 110px;
+            height: 110px;
+            background-color: #fffefe;
             border-radius: 50%;
             display: flex;
             justify-content: center;
@@ -183,11 +187,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="login-card">
         <div class="avatar-circle" aria-hidden="true">
-            U
+            <img src="assets/img/logotb.png">
         </div>
 
         <div class="login-header">
-            <h2>Halaman Login</h2>
+            <h2>SIVENPRAS-TB</h2>
             <p>Silakan login dengan benar</p>
         </div>
 
