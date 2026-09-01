@@ -32,6 +32,5 @@ if (!isset($breadcrumb)) $breadcrumb = 'Dashboard';
                 </a>
             <?php endif; ?>
 
-            <div class="avatar">AD</div>
         </div>
     </header>
