@@ -40,11 +40,7 @@ $q_ruangan = mysqli_query($koneksi, "SELECT r.id_ruangan, r.nama_ruangan, COUNT(
             </div>
         </a>
 
-        <a href="laporan.php" class="menu-item <?= ($active_page ?? '') == 'laporan' ? 'active' : ''; ?>">
-            <div class="menu-left">
-                <i class="bi bi-bar-chart-line-fill menu-icon"></i> Laporan
-            </div>
-        </a>
+
         
         <a href="ruangan.php" class="menu-item <?= ($active_page ?? '') == 'ruangan' ? 'active' : ''; ?>">
             <div class="menu-left">

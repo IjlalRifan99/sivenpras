@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['barcode'])) {
     } else {
         $query = mysqli_query($koneksi, "
             SELECT i.id_inventaris, i.barcode, i.keterangan, i.kondisi, i.ruangan_id,
-                   b.id_barang, b.nama_barang, b.kode_barang,
+                   b.id_barang, b.nama_barang,
                    k.nama_kategori, r.nama_ruangan
             FROM inventaris i
             JOIN barang b ON i.barang_id = b.id_barang
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_scanned_item']
 
         $barcode_lookup = mysqli_query($koneksi, "
             SELECT i.id_inventaris, i.barcode, i.keterangan, i.kondisi, i.ruangan_id,
-                   b.id_barang, b.nama_barang, b.kode_barang,
+                   b.id_barang, b.nama_barang,
                    k.nama_kategori, r.nama_ruangan
             FROM inventaris i
             JOIN barang b ON i.barang_id = b.id_barang
@@ -116,8 +116,8 @@ include 'includes/header.php';
 
                     <div class="scan-detail-grid">
                         <div>
-                            <label class="scan-field-label">Kode Barang</label>
-                            <input type="text" class="search-box-input" value="<?= htmlspecialchars($scan_result['kode_barang'] ?? ''); ?>" readonly>
+                            <label class="scan-field-label">ID Barang</label>
+                            <input type="text" class="search-box-input" value="<?= htmlspecialchars($scan_result['id_barang'] ?? ''); ?>" readonly>
                         </div>
 
                         <div>

@@ -230,7 +230,6 @@ $sql_list = "
         i.keterangan AS keterangan_inventaris,
         i.update_at,
         b.nama_barang,
-        b.kode_barang,
         b.deskripsi,
         k.nama_kategori
     FROM inventaris i
@@ -408,7 +407,15 @@ $q_list = mysqli_query($koneksi, $sql_list);
                                 </td>
                                 <td class="qr-cell">
                                     <div class="qr-code" data-barcode="<?= htmlspecialchars($row['barcode']); ?>"></div>
-                                    <div class="barcode-label"><?= htmlspecialchars($row['barcode']); ?></div>
+                                    <?php
+                                        $seqPart = '';
+                                        if (!empty($row['barcode'])) {
+                                            $parts_bar = explode('-', $row['barcode']);
+                                            $seqPart = end($parts_bar);
+                                        }
+                                        $barcodeLabel = htmlspecialchars($row['nama_barang'] . ($seqPart ? ('-' . $seqPart) : ''), ENT_QUOTES, 'UTF-8');
+                                    ?>
+                                    <div class="barcode-label"><?= $barcodeLabel; ?></div>
                                 </td>
                             </tr>
                         <?php

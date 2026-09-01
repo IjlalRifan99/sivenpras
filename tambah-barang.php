@@ -39,6 +39,7 @@ if ($id_ruangan > 0) {
 // PROSES FORM SUBMIT
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if ($id_ruangan > 0) {
+        // Menambah unit barang ke ruangan tertentu
         $id_barang = isset($_POST['id_barang']) ? (int) $_POST['id_barang'] : 0;
         $jumlah = isset($_POST['jumlah']) ? (int) $_POST['jumlah'] : 0;
         $tahun_perolehan = isset($_POST['tahun_perolehan']) ? (int) $_POST['tahun_perolehan'] : $current_year;
@@ -48,20 +49,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $pesan_error = "Harap pilih jenis barang dan masukkan jumlah unit yang valid.";
         } else {
             $q_barang = mysqli_query($koneksi, "SELECT * FROM barang WHERE id_barang = '$id_barang' LIMIT 1");
-            $barang = mysqli_fetch_assoc($q_barang);
-
-            if (!$barang) {
+            if (!$q_barang || mysqli_num_rows($q_barang) == 0) {
                 $pesan_error = "Barang tidak ditemukan. Silakan pilih barang yang valid.";
-            } elseif (empty(trim($barang['kode_barang']))) {
-                $pesan_error = "Barang yang dipilih belum memiliki kode master. Silakan lengkapi data barang terlebih dahulu.";
             } else {
-                $kode_master = trim($barang['kode_barang']);
-                $ruangan_code = preg_replace('/[^A-Za-z0-9]/', '', strtoupper($ruangan['nama_ruangan']));
-                if ($ruangan_code === '') {
-                    $ruangan_code = $ruangan['id_ruangan'];
-                }
+                // New barcode format: {id_barang}-{ruangan_code}-{seq}
+                // derive ruangan_code from nama_ruangan (extract digits) or fallback to id
+                $ruangan_code = isset($ruangan['nama_ruangan']) ? preg_replace('/[^0-9]/', '', $ruangan['nama_ruangan']) : '';
+                if ($ruangan_code === '') $ruangan_code = (string) $id_ruangan;
 
-                $like_pattern = $kode_master . '-' . $ruangan_code . '-%';
+                $like_pattern = $id_barang . '-' . $ruangan_code . '-%';
                 $q_last = mysqli_query($koneksi, "SELECT barcode FROM inventaris WHERE barang_id = '$id_barang' AND ruangan_id = '$id_ruangan' AND barcode LIKE '$like_pattern' ORDER BY id_inventaris DESC LIMIT 1");
                 $next_seq = 1;
 
@@ -72,13 +68,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $next_seq = max(1, $last_seq + 1);
                 }
 
-                $kode_awal = $kode_master . '-' . $ruangan_code . '-' . str_pad($next_seq, 3, '0', STR_PAD_LEFT);
+                $kode_awal = $id_barang . '-' . $ruangan_code . '-' . str_pad($next_seq, 3, '0', STR_PAD_LEFT);
                 $saved = 0;
                 $errors = [];
 
                 for ($i = 0; $i < $jumlah; $i++) {
                     $seq = $next_seq + $i;
-                    $barcode = $kode_master . '-' . $ruangan_code . '-' . str_pad($seq, 3, '0', STR_PAD_LEFT);
+                    $barcode = $id_barang . '-' . $ruangan_code . '-' . str_pad($seq, 3, '0', STR_PAD_LEFT);
                     $query_inv = "INSERT INTO inventaris (barang_id, ruangan_id, tahun_perolehan, kondisi, keterangan, barcode) VALUES ('$id_barang', '$id_ruangan', '$tahun_perolehan', 'baik', '$keterangan', '$barcode')";
 
                     if (mysqli_query($koneksi, $query_inv)) {
@@ -97,13 +93,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
     } else {
+        // Menambah master barang
         $nama_barang = trim(mysqli_real_escape_string($koneksi, $_POST['nama_barang'] ?? ''));
         $id_kategori = isset($_POST['id_kategori']) ? (int) $_POST['id_kategori'] : 0;
-        $kode_barang = trim(mysqli_real_escape_string($koneksi, $_POST['kode_barang'] ?? ''));
         $keterangan = mysqli_real_escape_string($koneksi, $_POST['keterangan'] ?? '');
 
-        if ($nama_barang === '' || $id_kategori <= 0 || $kode_barang === '') {
-            $pesan_error = "Silakan lengkapi Nama Barang, Kategori, dan Kode Barang.";
+        if ($nama_barang === '' || $id_kategori <= 0) {
+            $pesan_error = "Silakan lengkapi Nama Barang dan Kategori.";
         } else {
             $q_kategori_check = mysqli_query($koneksi, "SELECT id_kategori FROM kategori WHERE id_kategori = '$id_kategori' LIMIT 1");
             if ($q_kategori_check && mysqli_num_rows($q_kategori_check) > 0) {
@@ -114,20 +110,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         if (empty($pesan_error)) {
-            $cek_kode = mysqli_query($koneksi, "SELECT id_barang FROM barang WHERE kode_barang = '$kode_barang' LIMIT 1");
-            if ($cek_kode && mysqli_num_rows($cek_kode) > 0) {
-                $pesan_error = "Kode Barang sudah dipakai. Silakan gunakan kode lain.";
+            $query_barang = "INSERT INTO barang (nama_barang, kategori_id, deskripsi) VALUES ('$nama_barang', '$id_kategori', '$keterangan')";
+            if (mysqli_query($koneksi, $query_barang)) {
+                $pesan_sukses = "Master barang berhasil ditambahkan.";
+                $nama_barang = '';
+                $id_kategori = 0;
+                $keterangan = '';
             } else {
-                $query_barang = "INSERT INTO barang (nama_barang, kategori_id, deskripsi, kode_barang) VALUES ('$nama_barang', '$id_kategori', '$keterangan', '$kode_barang')";
-                if (mysqli_query($koneksi, $query_barang)) {
-                    $pesan_sukses = "Master barang berhasil ditambahkan.";
-                    $nama_barang = '';
-                    $id_kategori = 0;
-                    $kode_barang = '';
-                    $keterangan = '';
-                } else {
-                    $pesan_error = "Gagal menyimpan master barang: " . mysqli_error($koneksi);
-                }
+                $pesan_error = "Gagal menyimpan master barang: " . mysqli_error($koneksi);
             }
         }
     }
@@ -173,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     <option value="">-- Pilih Barang --</option>
                                     <?php while ($b = mysqli_fetch_assoc($q_barang_katalog)) { ?>
                                         <option value="<?= $b['id_barang']; ?>"><?= htmlspecialchars($b['nama_barang']); ?>
-                                            (<?= htmlspecialchars($b['kode_barang']); ?>)</option>
+                                            (ID: <?= (int)$b['id_barang']; ?>)</option>
                                     <?php } ?>
                                 </select>
                             </div>
@@ -230,15 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     required
                                     style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
                             </div>
-                            <div>
-                                <label
-                                    style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
-                                    KODE BARANG <span style="color:red;">*</span>
-                                </label>
-                                <input type="text" name="kode_barang" value="<?= htmlspecialchars($kode_barang ?? ''); ?>"
-                                    required
-                                    style="width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
-                            </div>
+                            
                             <div>
                                 <label
                                     style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
@@ -276,51 +258,4 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
     </main>
 
-    <script>
-        function generateKodeOtomatis() {
-            var idBarang = document.getElementById("id_barang").value;
-            var inputKode = document.getElementById("kode_barang");
-            var selectKategori = document.getElementById("id_kategori");
-
-            if (idBarang === "") {
-                inputKode.value = "";
-                selectKategori.value = "";
-                return;
-            }
-
-            inputKode.value = "Memuat...";
-
-            var formData = new FormData();
-            formData.append('id_barang', idBarang);
-
-            fetch('get_kode_otomatis.php', {
-                method: 'POST',
-                body: formData
-            })
-                .then(response => response.text())
-                .then(text => {
-                    try {
-                        var data = JSON.parse(text);
-                        if (data.status === 'success') {
-                            inputKode.value = data.kode_barang;
-                            if (data.kategori_id && data.kategori_id != 0) {
-                                selectKategori.value = String(data.kategori_id);
-                            } else {
-                                selectKategori.value = "";
-                            }
-                        } else {
-                            inputKode.value = "";
-                            selectKategori.value = "";
-                        }
-                    } catch (e) {
-                        console.error("Respon bukan JSON valid:", text);
-                        inputKode.value = "";
-                    }
-                })
-                .catch(error => {
-                    console.error('Error Fetch:', error);
-                    inputKode.value = "";
-                });
-        }
-    </script>
 <?php include 'includes/footer.php'; ?>

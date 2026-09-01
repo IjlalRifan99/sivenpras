@@ -19,7 +19,7 @@ $kondisi = isset($_GET['kondisi']) ? mysqli_real_escape_string($koneksi, $_GET['
 $where_clauses = [];
 
 if (!empty($search)) {
-    $where_clauses[] = "(b.nama_barang LIKE '%$search%' OR b.kode_barang LIKE '%$search%' OR r.nama_ruangan LIKE '%$search%')";
+    $where_clauses[] = "(b.nama_barang LIKE '%$search%' OR r.nama_ruangan LIKE '%$search%')";
 }
 
 if (!empty($kategori)) {
@@ -39,7 +39,6 @@ if (count($where_clauses) > 0) {
 $query = "
     SELECT 
         b.id_barang,
-        b.kode_barang,
         b.nama_barang,
         b.deskripsi,
         k.nama_kategori,
@@ -74,10 +73,9 @@ if ($q_ruangan) {
 }
 
 // Query Detail Unit Inventaris per Barang
-$detail_query = "
+    $detail_query = "
     SELECT 
         b.id_barang,
-        b.kode_barang,
         b.nama_barang,
         k.nama_kategori,
         i.barcode,
@@ -92,7 +90,7 @@ $detail_query = "
 ";
 
 if (!empty($search)) {
-    $detail_query .= " AND (b.nama_barang LIKE '%$search%' OR b.kode_barang LIKE '%$search%' OR r.nama_ruangan LIKE '%$search%')";
+    $detail_query .= " AND (b.nama_barang LIKE '%$search%' OR r.nama_ruangan LIKE '%$search%')";
 }
 if (!empty($kategori)) {
     $detail_query .= " AND b.kategori_id = '$kategori'";
@@ -160,7 +158,7 @@ if ($q_detail_units) {
             <thead>
                 <tr>
                     <th>NO</th>
-                    <th>KODE</th>
+                    <th>ID</th>
                     <th>NAMA BARANG</th>
                     <th>KATEGORI</th>
                     <th>KONDISI</th>
@@ -185,7 +183,7 @@ if ($q_detail_units) {
                         ?>
                         <tr>
                             <td style="font-weight: 500; color: #64748b;"><?= $no++; ?></td>
-                            <td style="font-weight: 700; color: #0f172a;"><?= htmlspecialchars($row['kode_barang']); ?></td>
+                            <td style="font-weight: 700; color: #0f172a;"><?= htmlspecialchars($row['id_barang']); ?></td>
                             <td>
                                 <strong style="display: block; color: #1e293b;"><?= htmlspecialchars($row['nama_barang']); ?></strong>
                                 <small style="color: #94a3b8;"><?= htmlspecialchars($row['deskripsi']); ?></small>
@@ -198,8 +196,7 @@ if ($q_detail_units) {
                             <td style="font-weight: 600; color: #0f172a;">
                                 <?= number_format($row['jumlah_unit']); ?>
                                 <button type="button" class="btn-view-units" data-barang-id="<?= $row['id_barang']; ?>"
-                                    data-barang-nama="<?= htmlspecialchars($row['nama_barang'], ENT_QUOTES, 'UTF-8'); ?>"
-                                    data-barang-kode="<?= htmlspecialchars($row['kode_barang'], ENT_QUOTES, 'UTF-8'); ?>">
+                                    data-barang-nama="<?= htmlspecialchars($row['nama_barang'], ENT_QUOTES, 'UTF-8'); ?>">
                                     Detail
                                 </button>
                             </td>
@@ -312,26 +309,36 @@ if ($q_detail_units) {
     }
 
     .btn-export-excel {
-        padding: 10px 16px;
-        background: #3b82f6;
+        padding: 12px 20px;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
         color: #fff;
         border: none;
         border-radius: 8px;
         font-size: 14px;
         font-weight: 600;
         cursor: pointer;
-        transition: background 0.2s;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(59, 130, 246, 0.25);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
     }
 
     .btn-export-excel:hover {
-        background: #2563eb;
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        box-shadow: 0 6px 12px rgba(59, 130, 246, 0.35);
+        transform: translateY(-2px);
+    }
+
+    .btn-export-excel:active {
+        transform: translateY(0);
     }
 
     /* --- CHECKBOX LIST --- */
     .checkbox-list {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 4px;
         padding: 0 20px;
     }
 
@@ -339,19 +346,22 @@ if ($q_detail_units) {
         display: flex;
         align-items: center;
         gap: 10px;
-        padding: 10px;
-        border-radius: 6px;
-        transition: background 0.2s;
+        padding: 12px 14px;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
     }
 
     .checkbox-item:hover {
-        background: #f1f5f9;
+        background: #f0f9ff;
+        border-color: #3b82f6;
     }
 
     .checkbox-item input[type="checkbox"] {
         cursor: pointer;
         width: 18px;
         height: 18px;
+        accent-color: #3b82f6;
     }
 
     .checkbox-item label {
@@ -359,6 +369,7 @@ if ($q_detail_units) {
         font-size: 14px;
         color: #334155;
         flex: 1;
+        font-weight: 500;
     }
 
     /* --- FITUR FILTER BAR --- */
@@ -574,25 +585,41 @@ if ($q_detail_units) {
     }
 
     .modal-footer-custom {
-        margin-top: 16px;
+        margin-top: 20px;
         text-align: right;
         border-top: 1px solid #e2e8f0;
-        padding-top: 12px;
+        padding-top: 16px;
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
     }
 
     .btn-close-modal {
-        padding: 8px 16px;
-        background: #64748b;
-        color: #fff;
+        padding: 10px 18px;
+        background: #e2e8f0;
+        color: #334155;
         border: none;
         border-radius: 6px;
         cursor: pointer;
-        font-size: 13px;
-        font-weight: 500;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.2s ease;
     }
 
     .btn-close-modal:hover {
-        background: #475569;
+        background: #cbd5e1;
+        transform: translateY(-2px);
+    }
+
+    .modal-footer-custom button[type="submit"] {
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        color: #fff;
+        box-shadow: 0 4px 6px rgba(34, 197, 94, 0.25);
+    }
+
+    .modal-footer-custom button[type="submit"]:hover {
+        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+        box-shadow: 0 6px 12px rgba(34, 197, 94, 0.35);
     }
 </style>
 
@@ -625,7 +652,7 @@ if ($q_detail_units) {
         }
     }
 
-    function renderModalRows(units, kondisiFilter, barangNama, barangKode) {
+    function renderModalRows(units, kondisiFilter, barangNama, barangId) {
         const body = document.getElementById('modalBody');
         const subtitle = document.getElementById('modalSubtitle');
         const filter = (kondisiFilter || '').toLowerCase().trim();
@@ -658,7 +685,7 @@ if ($q_detail_units) {
         }
 
         if (subtitle) {
-            subtitle.textContent = `Kode: ${barangKode} | ${getFilterLabel(filter)}: ${filtered.length} unit`;
+            subtitle.textContent = `ID: ${barangId} | ${getFilterLabel(filter)}: ${filtered.length} unit`;
         }
     }
 
@@ -751,9 +778,8 @@ if ($q_detail_units) {
             btn.addEventListener('click', function () {
                 const barangId = this.getAttribute('data-barang-id');
                 const barangNama = this.getAttribute('data-barang-nama');
-                const barangKode = this.getAttribute('data-barang-kode');
 
-                openModal(barangId, barangNama, barangKode);
+                openModal(barangId, barangNama);
             });
         });
 
@@ -763,10 +789,9 @@ if ($q_detail_units) {
                 if (!modal.classList.contains('show')) return;
 
                 const barangId = modal.dataset.barangId;
-                const barangKode = modal.dataset.barangKode || '';
                 const barangNama = document.getElementById('modalNamaBarang').textContent;
                 const units = detailUnits[barangId] || [];
-                renderModalRows(units, this.value, barangNama, barangKode);
+                renderModalRows(units, this.value, barangNama, barangId);
             });
         }
 
