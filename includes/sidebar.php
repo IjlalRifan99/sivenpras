@@ -1,5 +1,7 @@
 <?php
 $q_ruangan = mysqli_query($koneksi, "SELECT r.id_ruangan, r.nama_ruangan, COUNT(i.id_inventaris) AS total_barang FROM ruangan r LEFT JOIN inventaris i ON r.id_ruangan = i.ruangan_id GROUP BY r.id_ruangan, r.nama_ruangan ORDER BY r.nama_ruangan ASC");
+
+$user_role = strtolower($_SESSION['role'] ?? '');
 ?>
 
 <style>
@@ -178,7 +180,6 @@ $q_ruangan = mysqli_query($koneksi, "SELECT r.id_ruangan, r.nama_ruangan, COUNT(
 
     <nav class="sidebar-menu">
         <div class="menu-label">Menu Utama</div>
-
         <a href="index.php" class="menu-item <?= ($active_page ?? '') == 'dashboard' ? 'active' : ''; ?>">
             <div class="menu-left">
                 <i class="bi bi-grid-1x2-fill menu-icon"></i> Dashboard
@@ -208,9 +209,15 @@ $q_ruangan = mysqli_query($koneksi, "SELECT r.id_ruangan, r.nama_ruangan, COUNT(
                 <i class="bi bi-building-fill menu-icon"></i> Ruangan
             </div>
         </a>
+
+        <a href="laporan.php" class="menu-item <?= ($active_page ?? '') == 'laporan' ? 'active' : ''; ?>">
+            <div class="menu-left">
+                <i class="bi bi-building-fill menu-icon"></i> Laporan
+            </div>
+        </a>
     </nav>
 
-    <nav class="sidebar-menu" style="margin-bottom:20px; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+    <nav <?php if($user_role === 'admin'): ?> class="sidebar-menu" style="margin-bottom:20px; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
         <div class="menu-label">Admin</div>
         <a href="manajemen-user.php" class="menu-item <?= ($active_page ?? '') == 'user' ? 'active' : ''; ?>">
             <div class="menu-left">
@@ -228,6 +235,7 @@ $q_ruangan = mysqli_query($koneksi, "SELECT r.id_ruangan, r.nama_ruangan, COUNT(
             </div>
         </a>
     </nav>
+        <?php endif; ?>
 
     <div class="sidebar-footer">
         <div class="menu-label">Sekolah</div>

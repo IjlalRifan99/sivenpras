@@ -244,8 +244,7 @@ include 'includes/header.php';
                     <select id="addRole" name="role" class="form-input" required>
                         <option value="admin">Admin</option>
                         <option value="kepala_sekolah">Kepala Sekolah</option>
-                        <option value="guru">Guru</option>
-                        <option value="user">User Biasa</option>
+                        <option value="staff">Staff</option>
                     </select>
                 </div>
             </div>
@@ -284,8 +283,7 @@ include 'includes/header.php';
                     <select id="editRole" name="role" class="form-input" required>
                         <option value="admin">Admin</option>
                         <option value="kepala_sekolah">Kepala Sekolah</option>
-                        <option value="guru">Guru</option>
-                        <option value="user">User Biasa</option>
+                        <option value="staff">Staff</option>
                     </select>
                 </div>
             </div>

@@ -10,23 +10,37 @@ if (isset($_SESSION['login'])) {
 
 $error = '';
 
-// Proses validasi saat form di-submit
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = mysqli_real_escape_string($koneksi, trim($_POST['username']));
     $password = trim($_POST['password']);
 
     if (!empty($username) && !empty($password)) {
-        // Sesuaikan nama tabel & kolom di database kamu jika berbeda (misal: tabel 'users' / 'user')
         $query = mysqli_query($koneksi, "SELECT * FROM users WHERE username = '$username'");
         
         if (mysqli_num_rows($query) === 1) {
             $user = mysqli_fetch_assoc($query);
             
-            // Verifikasi password (menggunakan password_verify jika di-hash, atau perbandingan langsung jika plain text)
-            if (password_verify($password, $user['password']) || $password === $user['password']) {
+            // Prioritaskan verifikasi BCRYPT Hash
+            $is_valid = false;
+
+            if (password_verify($password, $user['password'])) {
+                $is_valid = true;
+            } elseif ($password === $user['password']) {
+                // Fallback untuk akun lama yang tersimpan dalam bentuk Teks Biasa (Plaintext)
+                $is_valid = true;
+            }
+
+            if ($is_valid) {
                 $_SESSION['login'] = true;
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['user_id'] = $user['id_user'] ?? $user['id'];
+                
+                // PENTING: Simpan role ke SESSION agar pembatasan sidebar & hak akses bekerja
+                $raw_role = trim($user['role']);
+                if ($raw_role === 'kepala sekolah') {
+                    $raw_role = 'kepala_sekolah';
+                }
+                $_SESSION['role'] = $raw_role;
 
                 header("Location: index.php");
                 exit;
