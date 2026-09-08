@@ -1,6 +1,7 @@
 <?php
 if (!isset($page_title)) $page_title = 'SIVENPRAS';
 if (!isset($breadcrumb)) $breadcrumb = 'Dashboard';
+$user_role = strtolower($_SESSION['role'] ?? '');
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -23,14 +24,15 @@ if (!isset($breadcrumb)) $breadcrumb = 'Dashboard';
         <div class="breadcrumb">
             SIVENPRAS-TB &rsaquo; <span><?= htmlspecialchars($breadcrumb); ?></span>
         </div>
-
+        
+        <?php if ($user_role !== 'kepala_sekolah'): ?>
         <div class="topbar-actions">
-            <?php if (($active_page ?? '') !== 'ruangan' && ($active_page ?? '') !== 'tambah'  && ($active_page ?? '') !== 'laporan'): ?>
+            <?php if (($active_page ?? '') !== 'ruangan' && ($active_page ?? '') !== 'tambah' && ($active_page ?? '') !== 'laporan'): ?>
                 <a href="tambah-barang.php" class="btn-primary" style="text-decoration: none;">
                     <i class="bi bi-plus-lg"></i>
                     Tambah Barang
                 </a>
             <?php endif; ?>
-
         </div>
+        <?php endif; ?>
     </header>

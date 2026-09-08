@@ -7,6 +7,8 @@ if (!isset($_SESSION['login'])) {
     exit;
 }
 
+$user_role = strtolower($_SESSION['role'] ?? '');
+
 $active_page = 'ruangan';
 
 // 1. Ambil ID Ruangan dari URL
@@ -259,11 +261,13 @@ $q_list = mysqli_query($koneksi, $sql_list);
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h1 style="font-size: 26px; color: #0f172a; font-weight: 700;">
-            <?= htmlspecialchars($d_ruangan['nama_ruangan']); ?></h1>
-        <a href="tambah-barang.php?id_ruangan=<?= $id_ruangan; ?>"
-            style="background: #004d40; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">
-            + Tambah Barang ke Ruangan Ini
-        </a>
+            <?= htmlspecialchars($d_ruangan['nama_ruangan']); ?>
+        </h1>
+        <?php if ($user_role !== 'kepala_sekolah'): ?>
+            <a href="tambah-barang.php?id_ruangan=<?= $id_ruangan; ?>"
+                style="background: #004d40; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">
+                + Tambah Barang ke Ruangan Ini
+            </a> <?php endif; ?>
     </div>
 
     <div class="card-stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
@@ -385,40 +389,60 @@ $q_list = mysqli_query($koneksi, $sql_list);
                                     </div>
                                 </td>
                                 <td><?= htmlspecialchars($row['nama_kategori'] ?? '-'); ?></td>
+                                <!-- Kolom Keterangan -->
                                 <td>
-                                    <input type="text" class="search-box-input" style="width: 100%;"
-                                        value="<?= htmlspecialchars($row['keterangan_inventaris'] ?? ''); ?>"
-                                        placeholder="Tambah keterangan..."
-                                        onchange="saveKeteranganInline(<?= $row['id_inventaris']; ?>, this)">
+                                    <?php if ($user_role === 'kepala_sekolah'): ?>
+                                        <?php
+                                        $ket = trim($row['keterangan_inventaris'] ?? '');
+                                        $text_ket = (!empty($ket) && $ket !== '-') ? $ket : 'tidak ada keterangan';
+                                        ?>
+                                        <span style="color: #334155; font-size: 13px;">
+                                            <?= htmlspecialchars($text_ket); ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <input type="text" class="search-box-input" style="width: 100%;"
+                                            value="<?= htmlspecialchars($row['keterangan_inventaris'] ?? ''); ?>"
+                                            placeholder="Tambah keterangan..."
+                                            onchange="saveKeteranganInline(<?= $row['id_inventaris']; ?>, this)">
+                                    <?php endif; ?>
                                 </td>
+
+                                <!-- Kolom Kondisi -->
                                 <td>
-                                    <select class="select-kondisi select-<?= str_replace(' ', '-', $kondisiLower); ?>"
-                                        onchange="saveConditionInline(<?= $row['id_inventaris']; ?>, this)">
-                                        <option value="baik" <?= $kondisiLower === 'baik' ? 'selected' : ''; ?>>Baik</option>
-                                        <option value="cukup baik" <?= $kondisiLower === 'cukup baik' ? 'selected' : ''; ?>>Cukup
-                                            Baik</option>
-                                        <option value="rusak" <?= $kondisiLower === 'rusak' ? 'selected' : ''; ?>>Rusak</option>
-                                        <option value="rusak parah" <?= $kondisiLower === 'rusak parah' ? 'selected' : ''; ?>>Rusak
-                                            Parah</option>
-                                        <option value="hilang" <?= $kondisiLower === 'hilang' ? 'selected' : ''; ?>>Hilang</option>
-                                    </select>
+                                    <?php if ($user_role === 'kepala_sekolah'): ?>
+                                        <span class="select-kondisi select-<?= str_replace(' ', '-', $kondisiLower); ?>"
+                                            style="display: inline-block; padding: 6px 12px; pointer-events: none;">
+                                            <?= htmlspecialchars(ucwords($row['kondisi'] ?? 'Baik')); ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <select class="select-kondisi select-<?= str_replace(' ', '-', $kondisiLower); ?>"
+                                            onchange="saveConditionInline(<?= $row['id_inventaris']; ?>, this)">
+                                            <option value="baik" <?= $kondisiLower === 'baik' ? 'selected' : ''; ?>>Baik</option>
+                                            <option value="cukup baik" <?= $kondisiLower === 'cukup baik' ? 'selected' : ''; ?>>Cukup
+                                                Baik</option>
+                                            <option value="rusak" <?= $kondisiLower === 'rusak' ? 'selected' : ''; ?>>Rusak</option>
+                                            <option value="rusak parah" <?= $kondisiLower === 'rusak parah' ? 'selected' : ''; ?>>Rusak
+                                                Parah</option>
+                                            <option value="hilang" <?= $kondisiLower === 'hilang' ? 'selected' : ''; ?>>Hilang</option>
+                                        </select>
+                                    <?php endif; ?>
                                 </td>
                                 <td><?= htmlspecialchars(date('d M Y H:i', strtotime($row['update_at'] ?? $row['created_at']))); ?>
                                 </td>
                                 <td class="qr-cell">
                                     <div class="qr-code" data-barcode="<?= htmlspecialchars($row['barcode']); ?>"></div>
                                     <?php
-                                        $seqPart = '';
-                                        if (!empty($row['barcode'])) {
-                                            $parts_bar = explode('-', $row['barcode']);
-                                            $seqPart = end($parts_bar);
-                                        }
-                                        $barcodeLabel = htmlspecialchars($row['nama_barang'] . ($seqPart ? ('-' . $seqPart) : ''), ENT_QUOTES, 'UTF-8');
+                                    $seqPart = '';
+                                    if (!empty($row['barcode'])) {
+                                        $parts_bar = explode('-', $row['barcode']);
+                                        $seqPart = end($parts_bar);
+                                    }
+                                    $barcodeLabel = htmlspecialchars($row['nama_barang'] . ($seqPart ? ('-' . $seqPart) : ''), ENT_QUOTES, 'UTF-8');
                                     ?>
                                     <div class="barcode-label"><?= $barcodeLabel; ?></div>
                                 </td>
                             </tr>
-                        <?php
+                            <?php
                         }
                     } else {
                         ?>
@@ -435,11 +459,12 @@ $q_list = mysqli_query($koneksi, $sql_list);
                 style="display: none; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 18px;">
                 <span id="selectedCountText" style="font-size: 13px; color: #475569;">0 item terpilih</span>
                 <button type="button" class="btn-action btn-print" onclick="printSelectedItems()">Print</button>
-                <button type="submit" id="btnHapusMassal"
-                    onclick="return confirm('Apakah Anda yakin ingin menghapus barang yang dicentang?')"
-                    class="btn-action btn-delete">
-                    <i class="ph ph-trash"></i> Hapus
-                </button>
+                <?php if ($user_role !== 'kepala_sekolah'): ?>
+                    <button type="submit" id="btnHapusMassal"
+                        onclick="return confirm('Apakah Anda yakin ingin menghapus barang yang dicentang?')"
+                        class="btn-action btn-delete">
+                        <i class="ph ph-trash"></i> Hapus
+                    </button> <?php endif; ?>
             </div>
         </form>
         <button id="btnScrollTop" class="btn-scroll-top" title="Kembali ke atas"><i class="bi bi-arrow-up"></i></button>
@@ -451,27 +476,27 @@ $q_list = mysqli_query($koneksi, $sql_list);
 
 <style>
     .btn-scroll-top {
-    position: fixed;
-    bottom: 80px;
-    right: 30px;
-    z-index: 999;
-    display: none;
-    border: none;
-    outline: none;
-    background-color: #0f172a;
-    color: white;
-    cursor: pointer;
-    padding: 20px 20px;
-    border-radius: 50%;
-    font-size: 20px;
-    box-shadow: 0px 4px 10px black;
-    transition: all 0.3s ease-in-out;
-}
+        position: fixed;
+        bottom: 80px;
+        right: 30px;
+        z-index: 999;
+        display: none;
+        border: none;
+        outline: none;
+        background-color: #0f172a;
+        color: white;
+        cursor: pointer;
+        padding: 20px 20px;
+        border-radius: 50%;
+        font-size: 20px;
+        box-shadow: 0px 4px 10px black;
+        transition: all 0.3s ease-in-out;
+    }
 
-.btn-scroll-top:hover {
-    background-color: #2563eb; 
-    transform: translateY(-3px);
-}
+    .btn-scroll-top:hover {
+        background-color: #2563eb;
+        transform: translateY(-3px);
+    }
 </style>
 
 <script>

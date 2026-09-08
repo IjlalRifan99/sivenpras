@@ -191,13 +191,13 @@ $user_role = strtolower($_SESSION['role'] ?? '');
                 <i class="bi bi-clipboard-data menu-icon"></i> Daftar Inventaris
             </div>
         </a>
-
+        <?php if($user_role !== 'kepala_sekolah'): ?>
         <a href="tambah-barang.php" class="menu-item <?= ($active_page ?? '') == 'tambah-barang' ? 'active' : ''; ?>">
             <div class="menu-left">
                 <i class="bi bi-plus-square-fill menu-icon"></i> Tambah Barang
             </div>
         </a>
-
+        <?php endif; ?>
         <a href="scan-barcode.php" class="menu-item <?= ($active_page ?? '') == 'scan-barcode' ? 'active' : ''; ?>">
             <div class="menu-left">
                 <i class="bi bi-upc-scan menu-icon"></i> Scan Barcode
