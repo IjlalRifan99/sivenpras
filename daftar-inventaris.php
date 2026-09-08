@@ -7,8 +7,16 @@ if (!isset($_SESSION['login'])) {
     exit;
 }
 
+$user_role = strtolower($_SESSION['role'] ?? '');
+
 // --- LOGIKA AJAX KELOLA GAMBAR (UPLOAD, EDIT, HAPUS) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_gambar'])) {
+    // Keamanan tambahan: Batasi eksekusi aksi ubah gambar jika role adalah kepala_sekolah
+    if ($user_role === 'kepala_sekolah') {
+        echo json_encode(['status' => 'error', 'message' => 'Akses ditolak.']);
+        exit;
+    }
+
     $id_barang = (int)$_POST['id_barang'];
     $action = $_POST['action_gambar'];
 
@@ -173,12 +181,6 @@ if ($q_detail_units) {
         <p>Total <?= $result_barang ? mysqli_num_rows($result_barang) : 0; ?> jenis barang tercatat dalam sistem</p>
     </div>
 
-    <div class="action-bar">
-        <button type="button" class="btn-export-excel" onclick="openExportModal()">
-            📊 Export Excel
-        </button>
-    </div>
-
     <form method="GET" action="daftar-inventaris.php" class="filter-bar">
         <div class="filter-input-wrapper">
             <input type="text" name="search" class="filter-input" placeholder="Cari nama, kode, atau lokasi..."
@@ -282,7 +284,9 @@ if ($q_detail_units) {
             <div id="photoAreaContainer" style="margin-bottom: 20px;"></div>
             
             <!-- Hidden File Input for Dynamic Upload -->
-            <input type="file" id="imageFileInput" accept="image/*" style="display: none;">
+            <?php if ($user_role !== 'kepala_sekolah'): ?>
+                <input type="file" id="imageFileInput" accept="image/*" style="display: none;">
+            <?php endif; ?>
 
             <!-- Info Utama -->
             <div class="info-row">
@@ -314,46 +318,7 @@ if ($q_detail_units) {
     </div>
 </div>
 
-<!-- MODAL EXPORT EXCEL -->
-<div id="exportModal" class="modal-backdrop">
-    <div class="modal-content-panel">
-        <div class="modal-header-custom">
-            <div>
-                <h3 class="modal-title-custom">Export Excel Inventaris</h3>
-                <span class="modal-subtitle-custom">Pilih ruangan yang ingin diekspor</span>
-            </div>
-            <button type="button" onclick="closeExportModal()" class="btn-close-icon">&times;</button>
-        </div>
-
-        <form id="exportForm" method="POST" action="export-inventaris.php" onsubmit="return validateRuanganSelection()">
-            <div class="modal-body-scroll" style="padding: 20px 0;">
-                <div class="checkbox-list">
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="selectAll" onchange="toggleAllRuangan(this)">
-                        <label for="selectAll" style="font-weight: 600;">Pilih Semua Ruangan</label>
-                    </div>
-                    <hr style="margin: 12px 0; border: none; border-top: 1px solid #e2e8f0;">
-                    
-                    <?php foreach ($ruangan_list as $ruang): ?>
-                        <div class="checkbox-item">
-                            <input type="checkbox" name="ruangan[]" value="<?= $ruang['id_ruangan']; ?>" 
-                                   class="ruangan-checkbox">
-                            <label><?= htmlspecialchars($ruang['nama_ruangan']); ?></label>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-
-            <div class="modal-footer-custom">
-                <button type="button" onclick="closeExportModal()" class="btn-close-modal" style="background: #94a3b8;">Batal</button>
-                <button type="submit" class="btn-close-modal" style="background: #22c55e; margin-left: 8px;">Export</button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <style>
-    /* --- STYLE MODAL SESUAI WIREFRAME --- */
     .modal-backdrop {
         display: none;
         position: fixed;
@@ -374,23 +339,13 @@ if ($q_detail_units) {
     }
 
     @keyframes fadeIn {
-        from {
-            opacity: 0;
-        }
-        to {
-            opacity: 1;
-        }
+        from { opacity: 0; }
+        to { opacity: 1; }
     }
 
     @keyframes slideUp {
-        from {
-            transform: translateY(20px);
-            opacity: 0;
-        }
-        to {
-            transform: translateY(0);
-            opacity: 1;
-        }
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
     }
 
     .modal-card {
@@ -445,7 +400,6 @@ if ($q_detail_units) {
         padding: 24px;
     }
 
-    /* CSS Foto, Tambah Gambar, Hover, Edit & Hapus */
     .btn-add-photo {
         width: 70%;
         height: 140px;
@@ -599,92 +553,6 @@ if ($q_detail_units) {
     }
 
     /* --- OTHER STYLES --- */
-    .action-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-    .btn-export-excel { 
-        padding: 12px 24px; 
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
-        color: #fff; 
-        border: none; 
-        border-radius: 10px; 
-        font-size: 14px; 
-        font-weight: 600; 
-        cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-    }
-    .btn-export-excel:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
-    }
-    
-    .checkbox-list { 
-        display: flex; 
-        flex-direction: column; 
-        gap: 8px; 
-        padding: 8px 0;
-    }
-    
-    .checkbox-item { 
-        display: flex; 
-        align-items: center; 
-        gap: 12px; 
-        padding: 12px 14px; 
-        border-radius: 8px;
-        transition: all 0.2s ease;
-        cursor: pointer;
-    }
-    
-    .checkbox-item:hover {
-        background-color: #f8fafc;
-    }
-    
-    .checkbox-item input[type="checkbox"] {
-        width: 18px;
-        height: 18px;
-        cursor: pointer;
-        accent-color: #3b82f6;
-    }
-    
-    .checkbox-item label {
-        cursor: pointer;
-        margin: 0;
-        color: #334155;
-        font-size: 14px;
-    }
-    
-    .modal-body-scroll { 
-        overflow-y: auto; 
-        flex: 1;
-        padding: 12px 0 !important;
-    }
-    
-    .modal-footer-custom { 
-        margin-top: 24px; 
-        text-align: right; 
-        border-top: 2px solid #f1f5f9; 
-        padding-top: 16px; 
-        display: flex; 
-        gap: 12px; 
-        justify-content: flex-end;
-    }
-    
-    .btn-close-modal { 
-        padding: 10px 20px; 
-        background: #e2e8f0; 
-        color: #334155; 
-        border: none; 
-        border-radius: 8px; 
-        cursor: pointer; 
-        font-size: 14px; 
-        font-weight: 600;
-        transition: all 0.2s ease;
-    }
-    
-    .btn-close-modal:hover {
-        background: #cbd5e1;
-        transform: translateY(-1px);
-    }
-    
     .filter-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
     .filter-input-wrapper { flex: 1; min-width: 250px; }
     .filter-input { width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
@@ -700,71 +568,6 @@ if ($q_detail_units) {
     .dot.green { background-color: #22c55e; }
     .dot.yellow { background-color: #eab308; }
     .dot.red { background-color: #ef4444; }
-
-    .modal-content-panel { 
-        background: #ffffff; 
-        width: 90%; 
-        max-width: 700px; 
-        border-radius: 16px; 
-        padding: 28px; 
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15); 
-        position: relative; 
-        max-height: 85vh; 
-        display: flex; 
-        flex-direction: column;
-        border: 1px solid #f0f4f8;
-        animation: slideUp 0.3s ease-out;
-    }
-    
-    .modal-header-custom { 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: flex-start;
-        border-bottom: 2px solid #f1f5f9; 
-        padding-bottom: 16px; 
-        margin-bottom: 20px;
-    }
-    
-    .modal-header-custom > div {
-        flex: 1;
-    }
-    
-    .modal-title-custom { 
-        margin: 0; 
-        font-size: 20px; 
-        font-weight: 700;
-        color: #0f172a;
-        letter-spacing: 0.3px;
-    }
-    
-    .modal-subtitle-custom { 
-        font-size: 14px; 
-        color: #64748b;
-        margin-top: 4px;
-    }
-    
-    .btn-close-icon { 
-        background: transparent; 
-        border: none; 
-        font-size: 28px; 
-        color: #94a3b8; 
-        cursor: pointer;
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 6px;
-        transition: all 0.2s ease;
-    }
-    
-    .btn-close-icon:hover {
-        background-color: #f1f5f9;
-        color: #334155;
-    }
-    .modal-body-scroll { overflow-y: auto; flex: 1; }
-    .modal-footer-custom { margin-top: 20px; text-align: right; border-top: 1px solid #e2e8f0; padding-top: 16px; display: flex; gap: 10px; justify-content: flex-end; }
-    .btn-close-modal { padding: 10px 18px; background: #e2e8f0; color: #334155; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
 </style>
 
 <script>
@@ -792,23 +595,34 @@ if ($q_detail_units) {
             container.innerHTML = `
                 <div class="photo-preview-wrapper">
                     <img src="uploads/barang/${escapeHtml(currentGambar)}" alt="Foto Barang">
+                    <?php if ($user_role !== 'kepala_sekolah'): ?>
                     <div class="photo-overlay">
                         <button class="btn-overlay btn-overlay-edit" onclick="triggerFileInput()">Edit</button>
                         <button class="btn-overlay btn-overlay-delete" onclick="handleDeleteGambar()">Hapus</button>
                     </div>
+                    <?php endif; ?>
                 </div>
             `;
         } else {
-            container.innerHTML = `
-                <button class="btn-add-photo" onclick="triggerFileInput()">
-                    <span>➕ Tambah Gambar</span>
-                </button>
-            `;
+            <?php if ($user_role !== 'kepala_sekolah'): ?>
+                container.innerHTML = `
+                    <button class="btn-add-photo" onclick="triggerFileInput()">
+                        <span>➕ Tambah Gambar</span>
+                    </button>
+                `;
+            <?php else: ?>
+                container.innerHTML = `
+                    <div style="width: 70%; height: 140px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; background-color: #f8fafc; border-radius: 12px; border: 1px dashed #cbd5e1; color: #94a3b8; font-size: 14px; font-weight: 500; box-sizing: border-box;">
+                        📷 Belum ada gambar
+                    </div>
+                `;
+            <?php endif; ?>
         }
     }
 
     function triggerFileInput() {
-        document.getElementById('imageFileInput').click();
+        const input = document.getElementById('imageFileInput');
+        if (input) input.click();
     }
 
     function handleDeleteGambar() {
@@ -851,7 +665,7 @@ if ($q_detail_units) {
         currentBarangId = barangId;
         currentGambar = barangGambar || '';
 
-        // Render Photo Area (Tambah Gambar vs Hover Overlay)
+        // Render Photo Area
         renderPhotoArea();
 
         // Render Meta Info
@@ -888,44 +702,6 @@ if ($q_detail_units) {
         if (modal) modal.classList.remove('show');
     }
 
-    function openExportModal() {
-        const modal = document.getElementById('exportModal');
-        if (modal) modal.classList.add('show');
-    }
-
-    function closeExportModal() {
-        const modal = document.getElementById('exportModal');
-        if (modal) modal.classList.remove('show');
-    }
-
-    function toggleAllRuangan(checkbox) {
-        const checkboxes = document.querySelectorAll('.ruangan-checkbox');
-        checkboxes.forEach(function (cb) {
-            cb.checked = checkbox.checked;
-        });
-    }
-
-    function validateRuanganSelection() {
-        const checkboxes = document.querySelectorAll('.ruangan-checkbox');
-        const isAnyChecked = Array.from(checkboxes).some(function (cb) {
-            return cb.checked;
-        });
-
-        if (!isAnyChecked) {
-            alert('Silakan pilih minimal satu ruangan untuk diekspor');
-            return false;
-        }
-
-        const submitBtn = document.querySelector('#exportForm button[type="submit"]');
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.textContent = '⏳ Sedang mengekspor...';
-            submitBtn.style.opacity = '0.6';
-        }
-
-        return true;
-    }
-
     document.addEventListener('DOMContentLoaded', function () {
         const buttons = document.querySelectorAll('.btn-view-units');
 
@@ -940,40 +716,39 @@ if ($q_detail_units) {
             });
         });
 
-        // Event listener Upload / Edit Gambar via input file
-        document.getElementById('imageFileInput').addEventListener('change', function () {
-            if (this.files && this.files[0]) {
-                const formData = new FormData();
-                formData.append('id_barang', currentBarangId);
-                formData.append('action_gambar', currentGambar ? 'edit' : 'upload');
-                formData.append('gambar_file', this.files[0]);
+        const imageFileInput = document.getElementById('imageFileInput');
+        if (imageFileInput) {
+            imageFileInput.addEventListener('change', function () {
+                if (this.files && this.files[0]) {
+                    const formData = new FormData();
+                    formData.append('id_barang', currentBarangId);
+                    formData.append('action_gambar', currentGambar ? 'edit' : 'upload');
+                    formData.append('gambar_file', this.files[0]);
 
-                fetch('daftar-inventaris.php', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        currentGambar = data.gambar;
-                        renderPhotoArea();
-                        updateButtonDataAttribute(currentBarangId, data.gambar);
-                    } else {
-                        alert(data.message || 'Gagal mengunggah gambar.');
-                    }
-                })
-                .catch(() => alert('Terjadi kesalahan koneksi.'));
-                
-                this.value = '';
-            }
-        });
+                    fetch('daftar-inventaris.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            currentGambar = data.gambar;
+                            renderPhotoArea();
+                            updateButtonDataAttribute(currentBarangId, data.gambar);
+                        } else {
+                            alert(data.message || 'Gagal mengunggah gambar.');
+                        }
+                    })
+                    .catch(() => alert('Terjadi kesalahan koneksi.'));
+                    
+                    this.value = '';
+                }
+            });
+        }
 
         const modal = document.getElementById('simpleModal');
-        const exportModal = document.getElementById('exportModal');
-
         window.addEventListener('click', function (e) {
             if (e.target === modal) closeModal();
-            if (e.target === exportModal) closeExportModal();
         });
     });
 </script>

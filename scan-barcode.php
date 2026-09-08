@@ -7,6 +7,9 @@ if (!isset($_SESSION['login'])) {
     exit;
 }
 
+// Ambil role user dari session
+$user_role = strtolower($_SESSION['role'] ?? '');
+
 $active_page = 'scan-barcode';
 $page_title = 'Scan Barcode';
 $breadcrumb = 'Scan Barcode';
@@ -39,36 +42,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['barcode'])) {
     }
 }
 
+// Logika Pembaruan Data (Hanya Eksekusi Jika BUKAN Kepala Sekolah)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_scanned_item'])) {
-    $id_inventaris = (int) ($_POST['id_inventaris'] ?? 0);
-    $keterangan = trim($_POST['keterangan'] ?? '');
-    $kondisi = strtolower(trim($_POST['kondisi'] ?? ''));
-    $allowed = ['baik', 'cukup baik', 'rusak', 'rusak parah', 'hilang'];
-
-    if ($id_inventaris > 0 && in_array($kondisi, $allowed, true)) {
-        $keterangan = mysqli_real_escape_string($koneksi, $keterangan);
-        $kondisi = mysqli_real_escape_string($koneksi, $kondisi);
-        mysqli_query($koneksi, "UPDATE inventaris SET keterangan = '$keterangan', kondisi = '$kondisi' WHERE id_inventaris = '$id_inventaris'");
-        $scan_error = '';
-        $scan_result = null;
-
-        $barcode_lookup = mysqli_query($koneksi, "
-            SELECT i.id_inventaris, i.barcode, i.keterangan, i.kondisi, i.ruangan_id,
-                   b.id_barang, b.nama_barang,
-                   k.nama_kategori, r.nama_ruangan
-            FROM inventaris i
-            JOIN barang b ON i.barang_id = b.id_barang
-            LEFT JOIN kategori k ON b.kategori_id = k.id_kategori
-            LEFT JOIN ruangan r ON i.ruangan_id = r.id_ruangan
-            WHERE i.id_inventaris = '$id_inventaris'
-            LIMIT 1
-        ");
-
-        if ($barcode_lookup && mysqli_num_rows($barcode_lookup) > 0) {
-            $scan_result = mysqli_fetch_assoc($barcode_lookup);
-        }
+    if ($user_role === 'kepala_sekolah') {
+        $scan_error = 'Akses ditolak: Kepala sekolah tidak memiliki izin untuk mengubah data.';
     } else {
-        $scan_error = 'Data hasil scan tidak valid untuk diperbarui.';
+        $id_inventaris = (int) ($_POST['id_inventaris'] ?? 0);
+        $keterangan = trim($_POST['keterangan'] ?? '');
+        $kondisi = strtolower(trim($_POST['kondisi'] ?? ''));
+        $allowed = ['baik', 'cukup baik', 'rusak', 'rusak parah', 'hilang'];
+
+        if ($id_inventaris > 0 && in_array($kondisi, $allowed, true)) {
+            $keterangan = mysqli_real_escape_string($koneksi, $keterangan);
+            $kondisi = mysqli_real_escape_string($koneksi, $kondisi);
+            mysqli_query($koneksi, "UPDATE inventaris SET keterangan = '$keterangan', kondisi = '$kondisi' WHERE id_inventaris = '$id_inventaris'");
+            $scan_error = '';
+            $scan_result = null;
+
+            $barcode_lookup = mysqli_query($koneksi, "
+                SELECT i.id_inventaris, i.barcode, i.keterangan, i.kondisi, i.ruangan_id,
+                       b.id_barang, b.nama_barang,
+                       k.nama_kategori, r.nama_ruangan
+                FROM inventaris i
+                JOIN barang b ON i.barang_id = b.id_barang
+                LEFT JOIN kategori k ON b.kategori_id = k.id_kategori
+                LEFT JOIN ruangan r ON i.ruangan_id = r.id_ruangan
+                WHERE i.id_inventaris = '$id_inventaris'
+                LIMIT 1
+            ");
+
+            if ($barcode_lookup && mysqli_num_rows($barcode_lookup) > 0) {
+                $scan_result = mysqli_fetch_assoc($barcode_lookup);
+            }
+        } else {
+            $scan_error = 'Data hasil scan tidak valid untuk diperbarui.';
+        }
     }
 }
 
@@ -96,10 +104,8 @@ include 'includes/header.php';
             </div>
 
             <div class="scan-control-row">
-                <button type="button" id="startCamera" class="btn-primary scan-camera-btn scan-camera-start">Aktifkan
-                    Kamera</button>
-                <button type="button" id="stopCamera" class="btn-primary scan-camera-btn scan-camera-stop">Matikan
-                    Kamera</button>
+                <button type="button" id="startCamera" class="btn-primary scan-camera-btn scan-camera-start">Aktifkan Kamera</button>
+                <button type="button" id="stopCamera" class="btn-primary scan-camera-btn scan-camera-stop">Matikan Kamera</button>
             </div>
 
             <?php if (!empty($scan_error)): ?>
@@ -140,18 +146,22 @@ include 'includes/header.php';
                         <div class="scan-field-field">
                             <label class="scan-field-label">Keterangan</label>
                             <input type="text" name="keterangan" class="search-box-input"
-                                value="<?= htmlspecialchars($scan_result['keterangan'] ?? ''); ?>">
+                                value="<?= htmlspecialchars($scan_result['keterangan'] ?? ''); ?>" <?= ($user_role === 'kepala_sekolah') ? 'readonly' : ''; ?>>
                         </div>
 
                         <div>
                             <label class="scan-field-label">Kondisi</label>
-                            <select name="kondisi" class="filter-select scan-select">
-                                <option value="baik" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'baik' ? 'selected' : ''; ?>>Baik</option>
-                                <option value="cukup baik" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'cukup baik' ? 'selected' : ''; ?>>Cukup Baik</option>
-                                <option value="rusak" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'rusak' ? 'selected' : ''; ?>>Rusak</option>
-                                <option value="rusak parah" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'rusak parah' ? 'selected' : ''; ?>>Rusak Parah</option>
-                                <option value="hilang" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'hilang' ? 'selected' : ''; ?>>Hilang</option>
-                            </select>
+                            <?php if ($user_role === 'kepala_sekolah'): ?>
+                                <input type="text" class="search-box-input" value="<?= ucwords(htmlspecialchars($scan_result['kondisi'] ?? '-')); ?>" readonly>
+                            <?php else: ?>
+                                <select name="kondisi" class="filter-select scan-select">
+                                    <option value="baik" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'baik' ? 'selected' : ''; ?>>Baik</option>
+                                    <option value="cukup baik" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'cukup baik' ? 'selected' : ''; ?>>Cukup Baik</option>
+                                    <option value="rusak" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'rusak' ? 'selected' : ''; ?>>Rusak</option>
+                                    <option value="rusak parah" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'rusak parah' ? 'selected' : ''; ?>>Rusak Parah</option>
+                                    <option value="hilang" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'hilang' ? 'selected' : ''; ?>>Hilang</option>
+                                </select>
+                            <?php endif; ?>
                         </div>
 
                         <div>
@@ -161,10 +171,11 @@ include 'includes/header.php';
                         </div>
                     </div>
 
-
-                    <div class="scan-save-row">
-                        <button type="submit" class="btn-primary">Simpan Perubahan</button>
-                    </div>
+                    <?php if ($user_role !== 'kepala_sekolah'): ?>
+                        <div class="scan-save-row">
+                            <button type="submit" class="btn-primary">Simpan Perubahan</button>
+                        </div>
+                    <?php endif; ?>
                 </form>
             <?php else: ?>
                 <div class="scan-empty-state">
@@ -176,220 +187,40 @@ include 'includes/header.php';
 </div>
 
 <style>
-    .scan-page-shell {
-        box-sizing: border-box;
-    }
-
-    .scan-page-title {
-        font-size: 28px;
-        color: #0f172a;
-        font-weight: 700;
-        margin-bottom: 20px;
-    }
-
-    .scan-layout {
-        display: grid;
-        grid-template-columns: 1.1fr 1.3fr;
-        gap: 24px;
-        align-items: start;
-    }
-
-    .scan-panel,
-    .scan-result-panel {
-        padding: 20px;
-    }
-
-    .scan-panel-title,
-    .scan-result-title {
-        margin-bottom: 18px;
-        color: #0f172a;
-    }
-
-    .scan-form {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .scan-manual-input {
-        width: 100%;
-        margin-bottom: 0 !important;
-        box-sizing: border-box;
-    }
-
-    .scan-submit-btn {
-        width: 100%;
-        justify-content: center;
-    }
-
-    .scanner-box {
-        margin-top: 18px;
-        border: 1px solid #cbd5e1;
-        border-radius: 12px;
-        min-height: 260px;
-        height: 320px;
-        background: linear-gradient(135deg, #f8fafc, #e2e8f0);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        position: relative;
-    }
-
-    .camera-preview {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: none;
-        background: #0f172a;
-    }
-
-    .camera-fallback {
-        text-align: center;
-        color: #475569;
-        padding: 20px;
-        display: none;
-    }
-
-    .camera-fallback-icon {
-        font-size: 40px;
-        display: block;
-        margin-bottom: 8px;
-    }
-
-    .scan-control-row {
-        margin-top: 14px;
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-
-    .scan-camera-btn {
-        flex: 1 1 180px;
-        justify-content: center;
-    }
-
-    .scan-camera-start {
-        background: #0f766e;
-    }
-
-    .scan-camera-stop {
-        background: #64748b;
-        display: none;
-    }
-
-    .scan-alert {
-        margin-top: 16px;
-        padding: 10px 14px;
-        border-radius: 8px;
-        background: #fee2e2;
-        border: 1px solid #fca5a5;
-        color: #991b1b;
-    }
-
-    .scan-detail-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 18px;
-    }
-
-    .scan-field-label {
-        display: block;
-        margin-bottom: 8px;
-        font-size: 12px;
-        font-weight: 700;
-        color: #475569;
-        text-transform: uppercase;
-    }
-
-    .scan-field-full {
-        grid-column: 1 / -1;
-    }
-
-    .scan-select {
-        width: 100%;
-    }
-
-    .scan-qr-wrap {
-        margin-top: 22px;
-    }
-
-    .scan-qr-box {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        border: 1px solid #dbe4ee;
-        border-radius: 12px;
-        background: #fff;
-        min-height: 180px;
-        padding: 20px;
-    }
-
-    .scan-save-row {
-        margin-top: 20px;
-        display: flex;
-        gap: 12px;
-        justify-content: flex-end;
-    }
-
-    .scan-empty-state {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 320px;
-        color: #64748b;
-        text-align: center;
-        padding: 20px;
-    }
-
+    .scan-page-shell { box-sizing: border-box; }
+    .scan-page-title { font-size: 28px; color: #0f172a; font-weight: 700; margin-bottom: 20px; }
+    .scan-layout { display: grid; grid-template-columns: 1.1fr 1.3fr; gap: 24px; align-items: start; }
+    .scan-panel, .scan-result-panel { padding: 20px; }
+    .scan-panel-title, .scan-result-title { margin-bottom: 18px; color: #0f172a; }
+    .scan-form { display: flex; flex-direction: column; gap: 12px; }
+    .scan-manual-input { width: 100%; margin-bottom: 0 !important; box-sizing: border-box; }
+    .scan-submit-btn { width: 100%; justify-content: center; }
+    .scanner-box { margin-top: 18px; border: 1px solid #cbd5e1; border-radius: 12px; min-height: 260px; height: 320px; background: linear-gradient(135deg, #f8fafc, #e2e8f0); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+    .camera-preview { width: 100%; height: 100%; object-fit: cover; display: none; background: #0f172a; }
+    .camera-fallback { text-align: center; color: #475569; padding: 20px; display: none; }
+    .camera-fallback-icon { font-size: 40px; display: block; margin-bottom: 8px; }
+    .scan-control-row { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .scan-camera-btn { flex: 1 1 180px; justify-content: center; }
+    .scan-camera-start { background: #0f766e; }
+    .scan-camera-stop { background: #64748b; display: none; }
+    .scan-alert { margin-top: 16px; padding: 10px 14px; border-radius: 8px; background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; }
+    .scan-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .scan-field-label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; }
+    .scan-field-full { grid-column: 1 / -1; }
+    .scan-select { width: 100%; }
+    .scan-save-row { margin-top: 20px; display: flex; gap: 12px; justify-content: flex-end; }
+    .scan-empty-state { display: flex; align-items: center; justify-content: center; min-height: 320px; color: #64748b; text-align: center; padding: 20px; }
     @media (max-width: 767px) {
-        .dashboard-container {
-            padding: 16px !important;
-        }
-
-        .scan-page-title {
-            font-size: 24px;
-            margin-bottom: 16px;
-        }
-
-        .scan-layout {
-            grid-template-columns: 1fr;
-            gap: 16px;
-        }
-
-        .scan-panel,
-        .scan-result-panel {
-            padding: 16px;
-        }
-
-        .scanner-box {
-            min-height: 220px;
-            height: 240px;
-        }
-
-        .scan-control-row {
-            flex-direction: column;
-        }
-
-        .scan-camera-btn,
-        .scan-submit-btn {
-            width: 100%;
-            flex: 1 1 100%;
-        }
-
-        .scan-detail-grid {
-            grid-template-columns: 1fr;
-            gap: 14px;
-        }
-
-        .scan-save-row {
-            justify-content: stretch;
-        }
-
-        .scan-save-row .btn-primary {
-            width: 100%;
-            justify-content: center;
-        }
+        .dashboard-container { padding: 16px !important; }
+        .scan-page-title { font-size: 24px; margin-bottom: 16px; }
+        .scan-layout { grid-template-columns: 1fr; gap: 16px; }
+        .scan-panel, .scan-result-panel { padding: 16px; }
+        .scanner-box { min-height: 220px; height: 240px; }
+        .scan-control-row { flex-direction: column; }
+        .scan-camera-btn, .scan-submit-btn { width: 100%; flex: 1 1 100%; }
+        .scan-detail-grid { grid-template-columns: 1fr; gap: 14px; }
+        .scan-save-row { justify-content: stretch; }
+        .scan-save-row .btn-primary { width: 100%; justify-content: center; }
     }
 </style>
 
@@ -406,25 +237,6 @@ include 'includes/header.php';
     let cameraStarted = false;
     let detectionLoop = null;
     let lastDetectedValue = '';
-
-    function renderQrCell() {
-        document.querySelectorAll('.qr-code').forEach(function (container) {
-            const code = container.dataset.barcode || '';
-            if (!code || container.children.length > 0) return;
-            if (typeof QRCode !== 'undefined') {
-                new QRCode(container, {
-                    text: code,
-                    width: 120,
-                    height: 120,
-                    colorDark: '#0f172a',
-                    colorLight: '#ffffff',
-                    correctLevel: QRCode.CorrectLevel.H
-                });
-            } else {
-                container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;width:120px;height:120px;border:1px dashed #cbd5e1;border-radius:10px;font-size:12px;color:#64748b;">QR</div>';
-            }
-        });
-    }
 
     function handleBarcodeInput(value) {
         const code = value.trim();
@@ -444,10 +256,6 @@ include 'includes/header.php';
         if (scanForm) {
             scanForm.submit();
         }
-    }
-
-    function resetDetectedState() {
-        lastDetectedValue = '';
     }
 
     function startDetectionLoop() {
@@ -492,37 +300,30 @@ include 'includes/header.php';
 
         for (const constraints of candidates) {
             try {
-                const tempStream = await navigator.mediaDevices.getUserMedia(constraints);
-                return tempStream;
+                return await navigator.mediaDevices.getUserMedia(constraints);
             } catch (error) {
-                if (error && error.name === 'OverconstrainedError') {
-                    continue;
-                }
+                if (error && error.name === 'OverconstrainedError') continue;
                 throw error;
             }
         }
-
         throw new Error('No camera constraints available');
     }
 
     async function startCamera() {
         if (!window.isSecureContext) {
-            showCameraMessage('Kamera belum bisa diakses. Pastikan HTTPS valid, sertifikat browser dipercaya, lalu tap tombol Aktifkan Kamera lagi.');
+            showCameraMessage('Kamera belum bisa diakses. Pastikan HTTPS valid.');
             return;
         }
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            showCameraMessage('Browser ini tidak mendukung akses kamera untuk scan barcode.');
+            showCameraMessage('Browser ini tidak mendukung akses kamera.');
             return;
         }
 
-        if (stream) {
-            return;
-        }
+        if (stream) return;
 
         try {
             stream = await getCameraStream();
-
             video.srcObject = stream;
             video.style.display = 'block';
             cameraFallback.style.display = 'none';
@@ -534,8 +335,8 @@ include 'includes/header.php';
             detectionLoop = requestAnimationFrame(startDetectionLoop);
         } catch (error) {
             const message = (error && error.name === 'NotAllowedError')
-                ? 'Kamera belum bisa diakses. Izinkan akses kamera di browser dan coba lagi dengan menekan tombol Aktifkan Kamera.'
-                : 'Kamera belum bisa diakses. Pastikan sertifikat HTTPS valid dan browser mengizinkan kamera. Anda tetap bisa memasukan barcode secara manual.';
+                ? 'Kamera belum bisa diakses. Izinkan akses kamera di browser.'
+                : 'Kamera belum bisa diakses. Gunakan pencarian manual.';
             showCameraMessage(message);
         }
     }
@@ -573,14 +374,6 @@ include 'includes/header.php';
     window.addEventListener('load', function () {
         startCamera();
     });
-
-    // window.addEventListener('pageshow', function() {
-    //     if (!stream) {
-    //         startCamera();
-    //     }
-    // });
-
-    renderQrCell();
 </script>
 
 <?php include 'includes/footer.php'; ?>
