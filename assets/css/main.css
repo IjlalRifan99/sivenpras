@@ -301,44 +301,6 @@
     background: #e2e8f0;
 }
 
-/* STYLE DROPDOWN SIDEBAR RUANGAN */
-.sidebar-dropdown-btn {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    user-select: none;
-    margin-top: 24px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    transition: background 0.2s;
-}
-
-.sidebar-dropdown-btn:hover {
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.sidebar-dropdown-container {
-    display: none;
-    flex-direction: column;
-    gap: 4px;
-    margin-top: 6px;
-    padding-left: 8px;
-    overflow: hidden;
-}
-
-.sidebar-dropdown-container.open {
-    display: flex;
-}
-
-.caret-icon {
-    transition: transform 0.3s ease;
-}
-
-.caret-icon.rotate {
-    transform: rotate(180deg);
-}
-
 /* Checkbox */
 input[type="checkbox"] {
     transform: scale(1.3);

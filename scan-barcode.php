@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['barcode'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_scanned_item'])) {
-    $id_inventaris = (int)($_POST['id_inventaris'] ?? 0);
+    $id_inventaris = (int) ($_POST['id_inventaris'] ?? 0);
     $keterangan = trim($_POST['keterangan'] ?? '');
     $kondisi = strtolower(trim($_POST['kondisi'] ?? ''));
     $allowed = ['baik', 'cukup baik', 'rusak', 'rusak parah', 'hilang'];
@@ -83,7 +83,8 @@ include 'includes/header.php';
             <h3 class="scan-panel-title">Scanner</h3>
 
             <form method="POST" action="scan-barcode.php" id="scanForm" class="scan-form">
-                <input type="text" name="barcode" id="barcodeInput" class="search-box-input scan-manual-input" placeholder="Cari Kode Barang Manual" autocomplete="off" autofocus>
+                <input type="text" name="barcode" id="barcodeInput" class="search-box-input scan-manual-input"
+                    placeholder="Cari Kode Barang Manual" autocomplete="off" autofocus>
                 <button type="submit" class="btn-primary scan-submit-btn">Cari Barang</button>
             </form>
 
@@ -95,8 +96,10 @@ include 'includes/header.php';
             </div>
 
             <div class="scan-control-row">
-                <button type="button" id="startCamera" class="btn-primary scan-camera-btn scan-camera-start">Aktifkan Kamera</button>
-                <button type="button" id="stopCamera" class="btn-primary scan-camera-btn scan-camera-stop">Matikan Kamera</button>
+                <button type="button" id="startCamera" class="btn-primary scan-camera-btn scan-camera-start">Aktifkan
+                    Kamera</button>
+                <button type="button" id="stopCamera" class="btn-primary scan-camera-btn scan-camera-stop">Matikan
+                    Kamera</button>
             </div>
 
             <?php if (!empty($scan_error)): ?>
@@ -115,54 +118,49 @@ include 'includes/header.php';
                     <input type="hidden" name="id_inventaris" value="<?= (int) $scan_result['id_inventaris']; ?>">
 
                     <div class="scan-detail-grid">
-                        <div>
-                            <label class="scan-field-label">ID Barang</label>
-                            <input type="text" class="search-box-input" value="<?= htmlspecialchars($scan_result['id_barang'] ?? ''); ?>" readonly>
-                        </div>
 
                         <div>
                             <label class="scan-field-label">Barcode</label>
-                            <input type="text" class="search-box-input" value="<?= htmlspecialchars($scan_result['barcode'] ?? ''); ?>" readonly>
+                            <input type="text" class="search-box-input"
+                                value="<?= htmlspecialchars($scan_result['barcode'] ?? ''); ?>" readonly>
                         </div>
 
                         <div>
                             <label class="scan-field-label">Nama Barang</label>
-                            <input type="text" class="search-box-input" value="<?= htmlspecialchars($scan_result['nama_barang'] ?? ''); ?>" readonly>
+                            <input type="text" class="search-box-input"
+                                value="<?= htmlspecialchars($scan_result['nama_barang'] ?? ''); ?>" readonly>
                         </div>
 
                         <div>
                             <label class="scan-field-label">Kategori</label>
-                            <input type="text" class="search-box-input" value="<?= htmlspecialchars($scan_result['nama_kategori'] ?? '-'); ?>" readonly>
+                            <input type="text" class="search-box-input"
+                                value="<?= htmlspecialchars($scan_result['nama_kategori'] ?? '-'); ?>" readonly>
                         </div>
 
-                        <div class="scan-field-full">
+                        <div class="scan-field-field">
                             <label class="scan-field-label">Keterangan</label>
-                            <input type="text" name="keterangan" class="search-box-input" value="<?= htmlspecialchars($scan_result['keterangan'] ?? ''); ?>">
+                            <input type="text" name="keterangan" class="search-box-input"
+                                value="<?= htmlspecialchars($scan_result['keterangan'] ?? ''); ?>">
                         </div>
 
                         <div>
                             <label class="scan-field-label">Kondisi</label>
                             <select name="kondisi" class="filter-select scan-select">
-                                <option value="baik" <?= strtolower((string)($scan_result['kondisi'] ?? '')) === 'baik' ? 'selected' : ''; ?>>Baik</option>
-                                <option value="cukup baik" <?= strtolower((string)($scan_result['kondisi'] ?? '')) === 'cukup baik' ? 'selected' : ''; ?>>Cukup Baik</option>
-                                <option value="rusak" <?= strtolower((string)($scan_result['kondisi'] ?? '')) === 'rusak' ? 'selected' : ''; ?>>Rusak</option>
-                                <option value="rusak parah" <?= strtolower((string)($scan_result['kondisi'] ?? '')) === 'rusak parah' ? 'selected' : ''; ?>>Rusak Parah</option>
-                                <option value="hilang" <?= strtolower((string)($scan_result['kondisi'] ?? '')) === 'hilang' ? 'selected' : ''; ?>>Hilang</option>
+                                <option value="baik" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'baik' ? 'selected' : ''; ?>>Baik</option>
+                                <option value="cukup baik" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'cukup baik' ? 'selected' : ''; ?>>Cukup Baik</option>
+                                <option value="rusak" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'rusak' ? 'selected' : ''; ?>>Rusak</option>
+                                <option value="rusak parah" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'rusak parah' ? 'selected' : ''; ?>>Rusak Parah</option>
+                                <option value="hilang" <?= strtolower((string) ($scan_result['kondisi'] ?? '')) === 'hilang' ? 'selected' : ''; ?>>Hilang</option>
                             </select>
                         </div>
 
                         <div>
                             <label class="scan-field-label">Ruangan</label>
-                            <input type="text" class="search-box-input" value="<?= htmlspecialchars($scan_result['nama_ruangan'] ?? '-'); ?>" readonly>
+                            <input type="text" class="search-box-input"
+                                value="<?= htmlspecialchars($scan_result['nama_ruangan'] ?? '-'); ?>" readonly>
                         </div>
                     </div>
 
-                    <div class="scan-qr-wrap">
-                        <label class="scan-field-label">QR CODE</label>
-                        <div class="scan-qr-box">
-                            <div class="qr-code" data-barcode="<?= htmlspecialchars($scan_result['barcode'] ?? ''); ?>" style="width:120px; height:120px;"></div>
-                        </div>
-                    </div>
 
                     <div class="scan-save-row">
                         <button type="submit" class="btn-primary">Simpan Perubahan</button>
@@ -410,7 +408,7 @@ include 'includes/header.php';
     let lastDetectedValue = '';
 
     function renderQrCell() {
-        document.querySelectorAll('.qr-code').forEach(function(container) {
+        document.querySelectorAll('.qr-code').forEach(function (container) {
             const code = container.dataset.barcode || '';
             if (!code || container.children.length > 0) return;
             if (typeof QRCode !== 'undefined') {
@@ -565,14 +563,14 @@ include 'includes/header.php';
 
     startCameraBtn.addEventListener('click', startCamera);
     stopCameraBtn.addEventListener('click', stopCamera);
-    barcodeInput.addEventListener('keydown', function(event) {
+    barcodeInput.addEventListener('keydown', function (event) {
         if (event.key === 'Enter') {
             event.preventDefault();
             handleBarcodeInput(this.value);
         }
     });
 
-    window.addEventListener('load', function() {
+    window.addEventListener('load', function () {
         startCamera();
     });
 

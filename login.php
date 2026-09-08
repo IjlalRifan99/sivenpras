@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             max-width: 420px;
             padding: 40px 35px;
             border-radius: 28px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 10px 25px rgb(0, 0, 0);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -79,6 +79,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .login-card img {
             width: 110px;
+            box-shadow: 0px 8px 10px rgba(0, 0, 0, 0.58);
+            border-radius: 50%;
         }
 
         /* Circle Avatar Atas */

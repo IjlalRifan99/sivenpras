@@ -7,7 +7,7 @@ if (!isset($_SESSION['login'])) {
     exit;
 }
 
-$active_page = 'ruangan';
+$active_page = 'manajemen-ruangan';
 $page_title = 'Manajemen Ruangan';
 $breadcrumb = 'Manajemen Ruangan';
 

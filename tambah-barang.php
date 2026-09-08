@@ -201,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     <form method="POST" action="tambah-barang.php<?= $id_ruangan > 0 ? '?id_ruangan=' . $id_ruangan : '' ?>"
         class="widget-card" enctype="multipart/form-data"
-        style="padding:24px;margin:0 auto;max-width:900px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        style="padding:24px;margin:0 auto;max-width:500px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
         <?php if ($id_ruangan > 0): ?>
             <input type="hidden" name="id_ruangan" value="<?= $id_ruangan; ?>">
 
