@@ -9,8 +9,8 @@ if (!isset($_SESSION['login'])) {
 
 $user_role = strtolower($_SESSION['role'] ?? '');
 $active_page = 'scan-barcode';
-$page_title = 'Scan Barcode';
-$breadcrumb = 'Scan Barcode';
+$page_title = 'Scan Barcode & QR';
+$breadcrumb = 'Scan Barcode & QR';
 
 $update_message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_scanned_item'])) {
@@ -31,10 +31,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_scanned_item']
 include 'includes/header.php';
 ?>
 
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<!-- Library Html5-Qrcode -->
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
 <div class="dashboard-container scan-page-shell" style="padding: 24px;">
-    <h1 class="scan-page-title">Scan Barcode</h1>
+    <h1 class="scan-page-title">Scan Barcode & QR Code</h1>
 
     <div class="scan-layout">
         <div class="widget-card scan-panel">
@@ -46,16 +47,22 @@ include 'includes/header.php';
                 <button type="button" id="btnCariManual" class="btn-primary scan-submit-btn">Cari Barang</button>
             </div>
 
+            <!-- Tombol Pilihan Mode Scan -->
+            <div class="scan-mode-row" style="margin-top: 16px; display: flex; gap: 8px;">
+                <button type="button" id="btnModeQR" class="btn-primary scan-mode-btn active-mode" style="flex: 1; justify-content: center; background: #0f766e;">Mode QR Code</button>
+                <button type="button" id="btnModeBarcode" class="btn-primary scan-mode-btn" style="flex: 1; justify-content: center; background: #475569;">Mode Barcode</button>
+            </div>
+
             <div id="scannerBox" class="scanner-box">
-                <video id="cameraPreview" autoplay playsinline muted class="camera-preview"></video>
-                <div id="cameraFallback" class="camera-fallback">
+                <div id="reader"></div>
+                <div id="cameraFallback" class="camera-fallback" style="display: none;">
                     <i class="bi bi-camera-video camera-fallback-icon"></i>
                 </div>
             </div>
 
             <div class="scan-control-row">
-                <button type="button" id="startCamera" class="btn-primary scan-camera-btn scan-camera-start">Aktifkan Kamera</button>
-                <button type="button" id="stopCamera" class="btn-primary scan-camera-btn scan-camera-stop">Matikan Kamera</button>
+                <button type="button" id="startCamera" class="btn-primary scan-camera-btn scan-camera-start" style="display: none;">Aktifkan Kamera</button>
+                <button type="button" id="stopCamera" class="btn-primary scan-camera-btn scan-camera-stop" style="background: #64748b;">Matikan Kamera</button>
             </div>
         </div>
 
@@ -68,14 +75,14 @@ include 'includes/header.php';
                 </div>
             <?php endif; ?>
 
-            <!-- Form Update (Muncul jika barang ditemukan) -->
+            <!-- Form Update -->
             <form method="POST" action="scan-barcode.php" id="formUpdate" style="display: none;">
                 <input type="hidden" name="update_scanned_item" value="1">
                 <input type="hidden" name="id_inventaris" id="res_id_inventaris">
 
                 <div class="scan-detail-grid">
                     <div>
-                        <label class="scan-field-label">Barcode</label>
+                        <label class="scan-field-label">Barcode / QR</label>
                         <input type="text" id="res_barcode" class="search-box-input" readonly>
                     </div>
 
@@ -122,9 +129,9 @@ include 'includes/header.php';
                 <?php endif; ?>
             </form>
 
-            <!-- State Kosong / Not Found (Muncul di panel hasil kanan) -->
+            <!-- State Kosong -->
             <div id="emptyState" class="scan-empty-state">
-                Belum ada data yang dipindai. Silakan scan atau masukkan barcode.
+                Belum ada data yang dipindai. Silakan pilih mode scan atau masukkan kode manual.
             </div>
         </div>
     </div>
@@ -139,26 +146,55 @@ include 'includes/header.php';
     .scan-form { display: flex; flex-direction: column; gap: 12px; }
     .scan-manual-input { width: 100%; margin-bottom: 0 !important; box-sizing: border-box; }
     .scan-submit-btn { width: 100%; justify-content: center; }
-    .scanner-box { margin-top: 18px; border: 1px solid #cbd5e1; border-radius: 12px; min-height: 260px; height: 320px; background: linear-gradient(135deg, #f8fafc, #e2e8f0); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
-    .camera-preview { width: 100%; height: 100%; object-fit: cover; display: none; background: #0f172a; }
-    .camera-fallback { text-align: center; color: #475569; padding: 20px; display: none; }
+    
+    .scanner-box { 
+        margin-top: 14px; 
+        border: 1px solid #cbd5e1; 
+        border-radius: 12px; 
+        height: 300px; 
+        background: #000; 
+        overflow: hidden; 
+        position: relative; 
+    }
+    #reader { 
+        width: 100% !important; 
+        height: 100% !important; 
+        border: none !important; 
+        background: transparent !important; 
+    }
+    #reader video { 
+        width: 100% !important; 
+        height: 100% !important; 
+        object-fit: cover !important; 
+        border-radius: 10px; 
+    }
+    #reader__dashboard_section_csr { display: none !important; }
+    #reader__scan_region img { display: none; }
+
+    .camera-fallback { 
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        display: flex; align-items: center; justify-content: center; flex-direction: column;
+        text-align: center; color: #94a3b8; background: #0f172a; 
+    }
     .camera-fallback-icon { font-size: 40px; display: block; margin-bottom: 8px; }
+
     .scan-control-row { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
     .scan-camera-btn { flex: 1 1 180px; justify-content: center; }
     .scan-camera-start { background: #0f766e; }
-    .scan-camera-stop { background: #64748b; display: none; }
+    .scan-camera-stop { background: #64748b; }
     .scan-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
     .scan-field-label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; }
-    .scan-field-full { grid-column: 1 / -1; }
     .scan-select { width: 100%; }
     .scan-save-row { margin-top: 20px; display: flex; gap: 12px; justify-content: flex-end; }
     .scan-empty-state { display: flex; align-items: center; justify-content: center; min-height: 320px; color: #64748b; text-align: center; padding: 20px; }
+
     @media (max-width: 767px) {
         .dashboard-container { padding: 16px !important; }
         .scan-page-title { font-size: 24px; margin-bottom: 16px; }
         .scan-layout { grid-template-columns: 1fr; gap: 16px; }
         .scan-panel, .scan-result-panel { padding: 16px; }
-        .scanner-box { min-height: 220px; height: 240px; }
+        .scanner-box { height: 220px !important; }
         .scan-control-row { flex-direction: column; }
         .scan-camera-btn, .scan-submit-btn { width: 100%; flex: 1 1 100%; }
         .scan-detail-grid { grid-template-columns: 1fr; gap: 14px; }
@@ -168,27 +204,23 @@ include 'includes/header.php';
 </style>
 
 <script>
-    const video = document.getElementById('cameraPreview');
-    const cameraFallback = document.getElementById('cameraFallback');
-    const startCameraBtn = document.getElementById('startCamera');
-    const stopCameraBtn = document.getElementById('stopCamera');
+    let html5QrCode = null;
+    let currentMode = 'qr'; // Default mode 'qr' atau 'barcode'
     const barcodeInput = document.getElementById('barcodeInput');
     const btnCariManual = document.getElementById('btnCariManual');
     const formUpdate = document.getElementById('formUpdate');
     const emptyState = document.getElementById('emptyState');
-
-    const detectionCanvas = document.createElement('canvas');
-    const detectionCtx = detectionCanvas.getContext('2d');
-    let stream = null;
-    let cameraStarted = false;
-    let detectionLoop = null;
+    const startCameraBtn = document.getElementById('startCamera');
+    const stopCameraBtn = document.getElementById('stopCamera');
+    const cameraFallback = document.getElementById('cameraFallback');
+    
+    const btnModeQR = document.getElementById('btnModeQR');
+    const btnModeBarcode = document.getElementById('btnModeBarcode');
     let isProcessing = false;
 
     async function processBarcode(code) {
         const cleanCode = code.trim();
-        if (!cleanCode) return;
-
-        if (isProcessing) return;
+        if (!cleanCode || isProcessing) return;
         isProcessing = true;
 
         try {
@@ -227,7 +259,7 @@ include 'includes/header.php';
                 emptyState.innerHTML = `
                     <div style="text-align: center; color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; padding: 20px; border-radius: 8px; width: 100%;">
                         <i class="bi bi-shield-exclamation" style="font-size: 36px; display: block; margin-bottom: 8px;"></i>
-                        <strong style="font-size: 15px;">Barcode Tidak Ditemukan</strong>
+                        <strong style="font-size: 15px;">Kode Tidak Ditemukan</strong>
                         <p style="margin: 6px 0 0 0; font-size: 13px; color: #7f1d1d;">
                             Kode <u style="font-weight: 600;">${htmlspecialchars(result.barcode)}</u> tidak terdaftar di database inventaris.
                         </p>
@@ -246,59 +278,93 @@ include 'includes/header.php';
         return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function startDetectionLoop() {
-        if (!cameraStarted || !video || !video.videoWidth || !video.videoHeight) {
-            detectionLoop = requestAnimationFrame(startDetectionLoop);
-            return;
-        }
-
-        const width = video.videoWidth;
-        const height = video.videoHeight;
-        detectionCanvas.width = width;
-        detectionCanvas.height = height;
-        detectionCtx.drawImage(video, 0, 0, width, height);
-
-        const imageData = detectionCtx.getImageData(0, 0, width, height);
-        const code = window.jsQR ? window.jsQR(imageData.data, width, height, { inversionAttempts: 'dontInvert' }) : null;
-
-        if (code && code.data && !isProcessing) {
-            barcodeInput.value = code.data;
-            processBarcode(code.data);
-        }
-
-        detectionLoop = requestAnimationFrame(startDetectionLoop);
-    }
-
     async function startCamera() {
         if (!window.isSecureContext) return;
 
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-            video.srcObject = stream;
-            video.style.display = 'block';
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("reader");
+            }
+
+            // Jika kamera sedang aktif, matikan dulu sebelum mengganti format/mode
+            if (html5QrCode.isScanning) {
+                await html5QrCode.stop();
+            }
+
+            // Tentukan format berdasarkan mode yang dipilih
+            let formatsToSupport = [];
+            let qrboxConfig = { width: 250, height: 150 };
+
+            if (currentMode === 'qr') {
+                formatsToSupport = [Html5QrcodeSupportedFormats.QR_CODE];
+                qrboxConfig = { width: 200, height: 200 };
+            } else {
+                // Barcode garis (Code 128, EAN, Code 39, dll)
+                formatsToSupport = [
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E
+                ];
+                qrboxConfig = { width: 260, height: 120 }; // Kotak agak melebar pas untuk barcode garis
+            }
+
+            const config = { 
+                fps: 15, 
+                qrbox: qrboxConfig,
+                formatsToSupport: formatsToSupport
+            };
+
+            await html5QrCode.start(
+                { facingMode: "environment" },
+                config,
+                (decodedText, decodedResult) => {
+                    barcodeInput.value = decodedText;
+                    processBarcode(decodedText);
+                },
+                (errorMessage) => {}
+            );
+
             cameraFallback.style.display = 'none';
             startCameraBtn.style.display = 'none';
             stopCameraBtn.style.display = 'inline-flex';
-            cameraStarted = true;
-            await video.play();
-            detectionLoop = requestAnimationFrame(startDetectionLoop);
         } catch (err) {
             console.error('Kamera error:', err);
+            cameraFallback.style.display = 'flex';
         }
     }
 
-    function stopCamera() {
-        cameraStarted = false;
-        if (detectionLoop) cancelAnimationFrame(detectionLoop);
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            stream = null;
+    async function stopCamera() {
+        if (html5QrCode && html5QrCode.isScanning) {
+            try {
+                await html5QrCode.stop();
+            } catch (err) {
+                console.error('Gagal mematikan kamera:', err);
+            }
         }
-        video.style.display = 'none';
-        cameraFallback.style.display = 'block';
         startCameraBtn.style.display = 'inline-flex';
         stopCameraBtn.style.display = 'none';
+        cameraFallback.style.display = 'flex';
     }
+
+    // Event Listener Ganti Mode
+    btnModeQR.addEventListener('click', () => {
+        if (currentMode === 'qr') return;
+        currentMode = 'qr';
+        btnModeQR.style.background = '#0f766e';
+        btnModeBarcode.style.background = '#475569';
+        startCamera(); // Restart kamera dengan mode QR
+    });
+
+    btnModeBarcode.addEventListener('click', () => {
+        if (currentMode === 'barcode') return;
+        currentMode = 'barcode';
+        btnModeBarcode.style.background = '#0f766e';
+        btnModeQR.style.background = '#475569';
+        startCamera(); // Restart kamera dengan mode Barcode garis
+    });
 
     startCameraBtn.addEventListener('click', startCamera);
     stopCameraBtn.addEventListener('click', stopCamera);
@@ -314,6 +380,7 @@ include 'includes/header.php';
         }
     });
 
+    // Otomatis nyalakan kamera saat halaman dimuat
     window.addEventListener('load', startCamera);
 </script>
 
