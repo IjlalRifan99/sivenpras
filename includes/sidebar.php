@@ -212,7 +212,7 @@ $user_role = strtolower($_SESSION['role'] ?? '');
 
         <a href="laporan.php" class="menu-item <?= ($active_page ?? '') == 'laporan' ? 'active' : ''; ?>">
             <div class="menu-left">
-                <i class="bi bi-building-fill menu-icon"></i> Laporan
+                <i class="bi bi-file-earmark-text menu-icon"></i> Laporan
             </div>
         </a>
     </nav>

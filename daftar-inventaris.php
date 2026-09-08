@@ -325,7 +325,7 @@ if ($q_detail_units) {
             <button type="button" onclick="closeExportModal()" class="btn-close-icon">&times;</button>
         </div>
 
-        <form id="exportForm" method="POST" action="export-inventaris.php" onsubmit="return validateRuanganSelection()">
+        <form id="exportForm" method="POST" action="api/export-inventaris.php" onsubmit="return validateRuanganSelection()">
             <div class="modal-body-scroll" style="padding: 20px 0;">
                 <div class="checkbox-list">
                     <div class="checkbox-item">

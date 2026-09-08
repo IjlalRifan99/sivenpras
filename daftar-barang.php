@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (empty($nama_barang) || $kategori_id <= 0) {
         $response['message'] = 'Nama barang dan kategori tidak boleh kosong!';
     } else {
-        // Cek barang sudah ada atau belum
+        
         $check_barang = mysqli_query($koneksi, "SELECT id_barang FROM barang WHERE nama_barang = '$nama_barang'");
         if (mysqli_num_rows($check_barang) > 0) {
             $response['message'] = 'Barang sudah ada!';
@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             throw new Exception('Gagal menghapus barang: ' . mysqli_error($koneksi));
         }
 
-        // Commit transaction
+
         mysqli_commit($koneksi);
         
         $response['status'] = 'success';
@@ -474,8 +474,7 @@ include 'includes/header.php';
         closeAllModals();
         document.getElementById('editBarangId').value = id;
         document.getElementById('editNamaBarang').value = nama;
-        
-        // Fetch barang data untuk get kategori
+    
         fetch('daftar-barang.php?get_barang=' + id)
             .then(response => response.json())
             .then(data => {
