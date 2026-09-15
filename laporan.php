@@ -275,6 +275,24 @@ if ($barang_id > 0) {
             </tbody>
         </table>
     </div>
+
+    <section class="approval-section" aria-label="Pengesahan laporan">
+        <p class="approval-heading">Mengetahui,</p>
+        <div class="approval-grid">
+            <div class="approval-column">
+                <p>Wakil Kepala Sekolah</p>
+                <p>Bidang Sarana Prasarana</p>
+                <div class="signature-space" aria-hidden="true"></div>
+                <p class="approval-name">Koderi, S.T</p>
+            </div>
+            <div class="approval-column">
+                <p>Kepala Sekolah</p>
+                <p>SMK Taruna Bangsa</p>
+                <div class="signature-space" aria-hidden="true"></div>
+                <p class="approval-name">Dody Suhendar, S.Pd.</p>
+            </div>
+        </div>
+    </section>
 </div>
 
 <style>
@@ -292,6 +310,35 @@ if ($barang_id > 0) {
     .btn-export-excel { background: #16a34a; color: white; }
     .btn-print { background: #0284c7; color: white; }
     .print-only { display: none; }
+    .approval-section {
+        margin: 34px 0 12px;
+        color: #0f172a;
+    }
+    .approval-heading {
+        margin: 0 0 18px;
+        text-align: center;
+        font-weight: 500;
+    }
+    .approval-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 48px;
+    }
+    .approval-column {
+        min-width: 0;
+        text-align: center;
+    }
+    .approval-column p {
+        margin: 0;
+        line-height: 1.5;
+    }
+    .signature-space {
+        height: 74px;
+    }
+    .approval-name {
+        font-weight: 700;
+        text-decoration: underline;
+    }
     @media print {
         .no-print, .sidebar, header, nav { display: none !important; }
         .print-only { display: block !important; }
@@ -301,6 +348,9 @@ if ($barang_id > 0) {
         .print-table { width: 100%; border-collapse: collapse !important; }
         .print-table th, .print-table td { border: 1px solid #000 !important; padding: 6px 8px !important; font-size: 11px !important; }
         .print-table th { background: #f1f5f9 !important; -webkit-print-color-adjust: exact; }
+        .approval-section { margin-top: 24px; page-break-inside: avoid; }
+        .approval-grid { gap: 24px; }
+        .signature-space { height: 58px; }
     }
 </style>
 

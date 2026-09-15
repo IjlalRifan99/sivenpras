@@ -9,6 +9,11 @@ if (!isset($_SESSION['login'])) {
 
 $user_role = strtolower($_SESSION['role'] ?? '');
 
+$q_bhp_ruangan_column = mysqli_query($koneksi, "SHOW COLUMNS FROM inventaris_bhp LIKE 'ruangan_id'");
+if (!$q_bhp_ruangan_column || mysqli_num_rows($q_bhp_ruangan_column) === 0) {
+    mysqli_query($koneksi, "ALTER TABLE inventaris_bhp ADD COLUMN ruangan_id INT NULL AFTER bhp_id");
+}
+
 $active_page = 'ruangan';
 
 // 1. Ambil ID Ruangan dari URL
@@ -232,6 +237,7 @@ $sql_list = "
         i.keterangan AS keterangan_inventaris,
         i.update_at,
         b.nama_barang,
+        b.barcode AS barcode_produk,
         b.deskripsi,
         k.nama_kategori
     FROM inventaris i
@@ -253,9 +259,24 @@ if (!empty($filter_kondisi)) {
 $sql_list .= " ORDER BY i.barcode ASC";
 $q_list = mysqli_query($koneksi, $sql_list);
 
+$sql_bhp_room = "
+    SELECT ib.id_inventaris_bhp, ib.jumlah, ib.satuan, ib.keterangan,
+           h.nama_barang, k.nama_kategori
+    FROM inventaris_bhp ib
+    JOIN bhp h ON ib.bhp_id = h.id_bhp
+    LEFT JOIN kategori_bhp k ON h.kategori_id = k.id_kategori
+    WHERE ib.ruangan_id = '$id_ruangan'
+";
+if (!empty($keyword)) {
+    $sql_bhp_room .= " AND (h.nama_barang LIKE '%$keyword%' OR k.nama_kategori LIKE '%$keyword%')";
+}
+$sql_bhp_room .= " ORDER BY h.nama_barang ASC";
+$q_bhp_room = mysqli_query($koneksi, $sql_bhp_room);
+
 ?>
 
 <?php include 'includes/header.php'; ?>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
 <div class="dashboard-container" style="padding: 24px;">
 
@@ -380,6 +401,7 @@ $q_list = mysqli_query($koneksi, $sql_list);
                                 <td style="text-align: center;">
                                     <input type="checkbox" name="ids_inventaris[]" value="<?= $row['id_inventaris']; ?>"
                                         class="item-checkbox" data-barcode="<?= htmlspecialchars($row['barcode']); ?>"
+                                        data-barcode-type="<?= !empty($row['barcode_produk']) ? 'barcode' : 'qr'; ?>"
                                         onchange="updateBatchDeleteButton()">
                                 </td>
                                 <td style="font-weight: 700; color: #0f172a;"><?= htmlspecialchars($row['barcode']); ?></td>
@@ -430,16 +452,21 @@ $q_list = mysqli_query($koneksi, $sql_list);
                                 <td><?= htmlspecialchars(date('d M Y H:i', strtotime($row['update_at'] ?? $row['created_at']))); ?>
                                 </td>
                                 <td class="qr-cell">
-                                    <div class="qr-code" data-barcode="<?= htmlspecialchars($row['barcode']); ?>"></div>
-                                    <?php
-                                    $seqPart = '';
-                                    if (!empty($row['barcode'])) {
-                                        $parts_bar = explode('-', $row['barcode']);
-                                        $seqPart = end($parts_bar);
-                                    }
-                                    $barcodeLabel = htmlspecialchars($row['nama_barang'] . ($seqPart ? ('-' . $seqPart) : ''), ENT_QUOTES, 'UTF-8');
-                                    ?>
-                                    <div class="barcode-label"><?= $barcodeLabel; ?></div>
+                                    <?php if (!empty($row['barcode_produk'])): ?>
+                                        <svg class="product-barcode" data-barcode="<?= htmlspecialchars($row['barcode']); ?>"></svg>
+                                        <div class="barcode-label"><?= htmlspecialchars($row['barcode']); ?></div>
+                                    <?php else: ?>
+                                        <div class="qr-code" data-barcode="<?= htmlspecialchars($row['barcode']); ?>"></div>
+                                        <?php
+                                        $seqPart = '';
+                                        if (!empty($row['barcode'])) {
+                                            $parts_bar = explode('-', $row['barcode']);
+                                            $seqPart = end($parts_bar);
+                                        }
+                                        $barcodeLabel = htmlspecialchars($row['nama_barang'] . ($seqPart ? ('-' . $seqPart) : ''), ENT_QUOTES, 'UTF-8');
+                                        ?>
+                                        <div class="barcode-label"><?= $barcodeLabel; ?></div>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                             <?php
@@ -467,6 +494,32 @@ $q_list = mysqli_query($koneksi, $sql_list);
                     </button> <?php endif; ?>
             </div>
         </form>
+
+        <?php if ($q_bhp_room && mysqli_num_rows($q_bhp_room) > 0): ?>
+            <div class="room-bhp-section">
+                <div class="room-bhp-heading">
+                    <h2>Barang Habis Pakai</h2>
+                    <span><?= mysqli_num_rows($q_bhp_room); ?> jenis BHP di ruangan ini</span>
+                </div>
+                <div class="room-bhp-table-wrap">
+                    <table class="room-bhp-table">
+                        <thead><tr><th>No</th><th>Nama Barang</th><th>Kategori</th><th>Jumlah</th><th>Satuan</th><th>Keterangan</th></tr></thead>
+                        <tbody>
+                            <?php $no_bhp = 1; while ($bhp_room = mysqli_fetch_assoc($q_bhp_room)): ?>
+                                <tr>
+                                    <td><?= $no_bhp++; ?></td>
+                                    <td><strong><?= htmlspecialchars($bhp_room['nama_barang']); ?></strong></td>
+                                    <td><?= htmlspecialchars($bhp_room['nama_kategori'] ?? '-'); ?></td>
+                                    <td><span class="room-bhp-amount"><?= (int) $bhp_room['jumlah']; ?></span></td>
+                                    <td><?= htmlspecialchars($bhp_room['satuan'] ?? '-'); ?></td>
+                                    <td><?= htmlspecialchars($bhp_room['keterangan'] ?: '-'); ?></td>
+                                </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        <?php endif; ?>
         <button id="btnScrollTop" class="btn-scroll-top" title="Kembali ke atas"><i class="bi bi-arrow-up"></i></button>
     </div>
 
@@ -475,6 +528,17 @@ $q_list = mysqli_query($koneksi, $sql_list);
 </main>
 
 <style>
+    .product-barcode { display:block; width:150px; height:52px; margin:0 auto; }
+    .room-bhp-section { margin-top:24px; padding:20px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; }
+    .room-bhp-heading { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .room-bhp-heading h2 { margin:0; color:#0f172a; font-size:18px; }
+    .room-bhp-heading span { color:#64748b; font-size:13px; }
+    .room-bhp-table-wrap { overflow-x:auto; }
+    .room-bhp-table { width:100%; min-width:600px; border-collapse:collapse; }
+    .room-bhp-table th, .room-bhp-table td { padding:12px 14px; border-bottom:1px solid #e2e8f0; text-align:left; font-size:14px; }
+    .room-bhp-table th { background:#f8fafc; color:#64748b; font-size:12px; text-transform:uppercase; }
+    .room-bhp-amount { display:inline-flex; min-width:34px; justify-content:center; padding:5px 9px; border-radius:6px; background:#fef3c7; color:#92400e; font-weight:700; }
+
     .btn-scroll-top {
         position: fixed;
         bottom: 80px;
@@ -621,6 +685,7 @@ $q_list = mysqli_query($koneksi, $sql_list);
             var row = cb.closest('tr');
             return {
                 barcode: cb.dataset.barcode || '',
+                barcodeType: cb.dataset.barcodeType || 'qr',
                 name: row ? (row.querySelector('td:nth-child(3) strong') || {}).textContent || '' : ''
             };
         });
@@ -653,6 +718,22 @@ $q_list = mysqli_query($koneksi, $sql_list);
         return dataUrl;
     }
 
+    function getBarcodeDataUrl(code) {
+        if (typeof JsBarcode === 'undefined') {
+            return '';
+        }
+
+        var canvas = document.createElement('canvas');
+        JsBarcode(canvas, code, {
+            format: 'CODE128',
+            width: 2,
+            height: 70,
+            displayValue: true,
+            margin: 8
+        });
+        return canvas.toDataURL('image/png');
+    }
+
     function printSelectedItems() {
         var items = getSelectedItems();
         if (items.length === 0) {
@@ -661,7 +742,9 @@ $q_list = mysqli_query($koneksi, $sql_list);
         }
 
         var itemHtml = items.map(function (item, index) {
-            var imageData = getQrDataUrl(item.barcode);
+            var imageData = item.barcodeType === 'barcode'
+                ? getBarcodeDataUrl(item.barcode)
+                : getQrDataUrl(item.barcode);
             return {
                 barcode: item.barcode,
                 name: item.name,
@@ -713,6 +796,19 @@ $q_list = mysqli_query($koneksi, $sql_list);
     }
 
     function renderBarcodeCells() {
+        document.querySelectorAll('.product-barcode').forEach(function (element) {
+            var code = element.dataset.barcode || '';
+            if (code && typeof JsBarcode !== 'undefined') {
+                JsBarcode(element, code, {
+                    format: 'CODE128',
+                    width: 1.5,
+                    height: 48,
+                    displayValue: false,
+                    margin: 4
+                });
+            }
+        });
+
         document.querySelectorAll('.qr-code').forEach(function (container) {
             var code = container.dataset.barcode || '';
             if (code && container.children.length === 0) {

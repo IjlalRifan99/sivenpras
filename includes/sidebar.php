@@ -16,6 +16,14 @@ $user_role = strtolower($_SESSION['role'] ?? '');
         left: 0;
         height: 100vh;
         /* Tambahkan scroll otomatis agar isi tidak terpotong saat di-zoom tinggi */
+    .inventory-menu-group { margin: 0; }
+    .inventory-menu-group > summary { list-style: none; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .inventory-menu-group > summary::-webkit-details-marker { display: none; }
+    .inventory-menu-chevron { font-size: 12px; transition: transform .2s ease; }
+    .inventory-menu-group[open] .inventory-menu-chevron { transform: rotate(180deg); }
+    .inventory-submenu { margin: 0 16px 6px 46px; border-left: 1px solid rgba(255,255,255,.16); }
+    .inventory-submenu-item { display: block; padding: 8px 12px; color: var(--text-sidebar); font-size: 12px; text-decoration: none; border-radius: 5px; }
+    .inventory-submenu-item:hover, .inventory-submenu-item.active { background: rgba(255,255,255,.1); color: #fff; }
         overflow-y: auto;
         z-index: 1000;
     }
@@ -186,11 +194,16 @@ $user_role = strtolower($_SESSION['role'] ?? '');
             </div>
         </a>
 
-        <a href="daftar-inventaris.php" class="menu-item <?= ($active_page ?? '') == 'inventaris' ? 'active' : ''; ?>">
-            <div class="menu-left">
-                <i class="bi bi-clipboard-data menu-icon"></i> Daftar Inventaris
+        <details class="inventory-menu-group" <?= in_array(($active_page ?? ''), ['inventaris', 'bhp'], true) ? 'open' : ''; ?>>
+            <summary class="menu-item <?= in_array(($active_page ?? ''), ['inventaris', 'bhp'], true) ? 'active' : ''; ?>">
+                <div class="menu-left"><i class="bi bi-clipboard-data menu-icon"></i> Daftar Inventaris</div>
+                <i class="bi bi-chevron-down inventory-menu-chevron"></i>
+            </summary>
+            <div class="inventory-submenu">
+                <a href="daftar-inventaris.php" class="inventory-submenu-item <?= ($active_page ?? '') == 'inventaris' ? 'active' : ''; ?>">Aset Tetap</a>
+                <a href="daftar-bhp.php" class="inventory-submenu-item <?= ($active_page ?? '') == 'bhp' ? 'active' : ''; ?>">Barang Habis Pakai</a>
             </div>
-        </a>
+        </details>
         <?php if($user_role !== 'kepala_sekolah'): ?>
         <a href="tambah-barang.php" class="menu-item <?= ($active_page ?? '') == 'tambah-barang' ? 'active' : ''; ?>">
             <div class="menu-left">
@@ -200,8 +213,7 @@ $user_role = strtolower($_SESSION['role'] ?? '');
         <?php endif; ?>
         <a href="scan-barcode.php" class="menu-item <?= ($active_page ?? '') == 'scan-barcode' ? 'active' : ''; ?>">
             <div class="menu-left">
-                <i class="bi bi-upc-scan menu-icon"></i> Scan Barcode
-            </div>
+                <i class="bi bi-upc-scan menu-icon"></i> Scan Barang</div>
         </a>
 
         <a href="ruangan.php" class="menu-item <?= ($active_page ?? '') == 'ruangan' ? 'active' : ''; ?>">
