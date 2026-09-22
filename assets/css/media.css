@@ -1,0 +1,240 @@
+:root {
+    --sidebar-width: 260px;
+}
+
+@media (max-width: 1200px) {
+    .main-content {
+        margin-left: 240px;
+        width: calc(100% - 240px);
+    }
+
+    .stats-grid,
+    .card-stats-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .dashboard-container {
+        padding: 22px !important;
+    }
+
+    .stat-card,
+    .widget-card,
+    .table-container {
+        padding: 16px !important;
+    }
+
+    .stat-card h2 {
+        font-size: 24px !important;
+    }
+
+    table th,
+    table td {
+        padding: 10px 12px !important;
+        font-size: 12px !important;
+    }
+
+    .filter-container {
+        padding: 12px !important;
+        gap: 8px !important;
+    }
+
+    .search-box-input,
+    .filter-select,
+    select,
+    input[type="text"],
+    input[type="search"] {
+        font-size: 12px !important;
+        padding: 8px 10px !important;
+    }
+}
+
+@media (max-width: 980px) {
+    body {
+        display: flex !important;
+        overflow-x: hidden;
+    }
+
+    .sidebar {
+        position: fixed !important;
+        width: 220px !important;
+        height: 100vh !important;
+        min-height: 100vh !important;
+        overflow-y: auto !important;
+    }
+
+    .main-content {
+        margin-left: 220px !important;
+        width: calc(100% - 220px) !important;
+        min-width: 0 !important;
+    }
+
+    .topbar {
+        padding: 16px 20px !important;
+        flex-wrap: wrap !important;
+        gap: 12px !important;
+    }
+
+    .topbar-actions {
+        width: auto !important;
+        justify-content: flex-end !important;
+    }
+
+    .dashboard-container {
+        padding: 20px !important;
+    }
+
+    .stats-grid,
+    .card-stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    .table-container,
+    .room-bhp-table-wrap,
+    .table-responsive,
+    table {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    .filter-container {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    .filter-item {
+        width: 100% !important;
+    }
+}
+
+@media (max-width: 640px) {
+    #sidebarToggleBtn {
+        display: flex !important;
+    }
+
+    body {
+        display: block !important;
+    }
+
+    .main-content {
+        margin-left: 220px !important;
+        width: calc(100% - 220px) !important;
+        transition: margin-left 0.25s ease, width 0.25s ease !important;
+    }
+
+    .sidebar {
+        position: fixed !important;
+        width: 220px !important;
+        transition: width 0.25s ease, transform 0.25s ease !important;
+    }
+
+    body.mobile-sidebar-collapsed .sidebar {
+        width: 76px !important;
+    }
+
+    body.mobile-sidebar-collapsed .main-content {
+        margin-left: 76px !important;
+        width: calc(100% - 76px) !important;
+    }
+
+    body.mobile-sidebar-collapsed .sidebar .brand-text,
+    body.mobile-sidebar-collapsed .sidebar .menu-label,
+    body.mobile-sidebar-collapsed .sidebar .menu-text,
+    body.mobile-sidebar-collapsed .sidebar .sidebar-footer,
+    body.mobile-sidebar-collapsed .sidebar .logout-item .menu-text {
+        display: none !important;
+    }
+
+    body.mobile-sidebar-collapsed .sidebar .sidebar-brand {
+        justify-content: center !important;
+        padding: 12px 8px !important;
+    }
+
+    body.mobile-sidebar-collapsed .sidebar .menu-item {
+        justify-content: center !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    body.mobile-sidebar-collapsed .sidebar .menu-item .menu-left {
+        gap: 0 !important;
+        justify-content: center !important;
+        width: 100% !important;
+    }
+
+    body.mobile-sidebar-collapsed .sidebar .inventory-menu-group .inventory-menu-chevron {
+        display: none !important;
+    }
+
+    body.mobile-sidebar-collapsed .sidebar .inventory-submenu {
+        display: none !important;
+    }
+
+    .sidebar-brand {
+        margin: 12px !important;
+        padding: 14px !important;
+    }
+
+    .brand-text h2 {
+        font-size: 15px !important;
+    }
+
+    .brand-text p {
+        font-size: 10px !important;
+    }
+
+    .menu-item {
+        padding: 12px 18px !important;
+        font-size: 13px !important;
+    }
+
+    .sidebar-footer {
+        padding: 18px 20px !important;
+    }
+
+    .dashboard-container {
+        padding: 16px !important;
+    }
+
+    .stats-grid,
+    .card-stats-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+
+    .topbar {
+        padding: 14px 16px !important;
+    }
+
+    .breadcrumb {
+        font-size: 12px !important;
+        line-height: 1.5 !important;
+    }
+
+    .btn-primary {
+        padding: 10px 14px !important;
+        font-size: 13px !important;
+    }
+
+    .widget-card,
+    .table-container {
+        padding: 16px 12px !important;
+        border-radius: 12px !important;
+    }
+
+    .page-header h1 {
+        font-size: 24px !important;
+    }
+
+    .page-header p {
+        font-size: 13px !important;
+    }
+
+    .inventory-menu-group .inventory-submenu {
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
+        margin-left: 18px !important;
+        margin-right: 12px !important;
+        box-shadow: none !important;
+    }
+}

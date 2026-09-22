@@ -269,6 +269,12 @@ canvas {
 }
 
 /* RESPONSIVE GLOBAL */
+@media (max-width: 1200px) {
+    .stats-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 980px) {
     body {
         display: block;
@@ -309,12 +315,13 @@ canvas {
         grid-template-columns: 1fr;
     }
 
+    .table-container,
+    .room-bhp-table-wrap,
     .inventory-table,
-    .detail-modal-table {
-        display: block;
-        width: 100%;
+    .detail-modal-table,
+    .table-responsive {
         overflow-x: auto;
-        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
     }
 }
 
@@ -392,5 +399,13 @@ canvas {
 
     .card-stats-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .table-container,
+    .room-bhp-table-wrap,
+    .inventory-table,
+    .detail-modal-table {
+        margin-left: -2px;
+        margin-right: -2px;
     }
 }
