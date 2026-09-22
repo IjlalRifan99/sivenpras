@@ -33,7 +33,7 @@ $user_role = strtolower($_SESSION['role'] ?? '');
         
         <?php if ($user_role !== 'kepala_sekolah'): ?>
         <div class="topbar-actions">
-            <?php if (($active_page ?? '') !== 'ruangan' && ($active_page ?? '') !== 'tambah' && ($active_page ?? '') !== 'laporan'): ?>
+            <?php if (($active_page ?? '') !== 'ruangan' && ($active_page ?? '') !== 'tambah' && ($active_page ?? '') !== 'laporan' && ($active_page ?? '') !== 'laporan-bhp' && ($active_page ?? '') !== 'bhp'): ?>
                 <a href="tambah-barang.php" class="btn-primary" style="text-decoration: none;">
                     <i class="bi bi-plus-lg"></i>
                     Tambah Barang

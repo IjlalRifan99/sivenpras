@@ -1,0 +1,738 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>Dokumentasi SIVENPRAS-TB</title>
+<style>body{font-family:Arial,sans-serif;color:#172033;line-height:1.45;margin:40px}h1{color:#0f766e;font-size:24pt;border-bottom:2px solid #0f766e;padding-bottom:8px}h2{color:#0f766e;font-size:16pt;margin-top:24px}h3{color:#334155;font-size:13pt;margin-top:18px}table{border-collapse:collapse;width:100%;margin:10px 0 18px}th,td{border:1px solid #cbd5e1;padding:7px;vertical-align:top}th{background:#e2e8f0}code,pre{font-family:Consolas,monospace}pre{background:#f1f5f9;padding:10px;white-space:pre-wrap}blockquote{border-left:4px solid #94a3b8;padding-left:12px;color:#475569}</style></head><body>
+<h1>Dokumentasi SIVENPRAS-TB</h1>
+<p>**Sistem Inventaris Sarana dan Prasarana Sekolah**  </p>
+<p>**Versi dokumentasi:** 1.0  </p>
+<p>**Tanggal:** 22 September 2026</p>
+<h2>1. Gambaran Umum</h2>
+<p>SIVENPRAS-TB adalah aplikasi berbasis PHP dan MySQL untuk mengelola data sarana-prasarana sekolah. Aplikasi menyediakan pencatatan katalog barang, unit inventaris, lokasi ruangan, barang habis pakai (BHP), kondisi barang, pemindaian barcode/QR, laporan, serta manajemen pengguna.</p>
+<p>Tujuan utama aplikasi:</p>
+<ul>
+<li>Menyediakan satu sumber data inventaris sekolah.</li>
+<li>Memudahkan pelacakan barang berdasarkan barcode, kategori, dan ruangan.</li>
+<li>Memperbarui kondisi dan keterangan setiap unit inventaris.</li>
+<li>Mengelola stok BHP dan distribusinya ke ruangan.</li>
+<li>Menghasilkan laporan yang dapat dicetak, disimpan sebagai PDF, atau diekspor ke Excel.</li>
+</ul>
+<h2>2. Teknologi dan Struktur Aplikasi</h2>
+<h3>2.1 Teknologi</h3>
+<ul>
+<li>Backend: PHP dengan `mysqli`.</li>
+<li>Database: MySQL/MariaDB, database `sivenpras_tb`.</li>
+<li>Frontend: HTML, CSS, JavaScript, Bootstrap Icons, dan AJAX/fetch.</li>
+<li>Pemindaian: `html5-qrcode` dari CDN.</li>
+<li>Barcode: `JsBarcode` dari CDN.</li>
+<li>Web server pengembangan: Apache/XAMPP.</li>
+</ul>
+<h3>2.2 Struktur direktori</h3>
+<table><thead><tr>
+<th>Direktori/File</th>
+<th>Fungsi</th>
+</tr></thead><tbody>
+<tr>
+<td>`index.php`</td>
+<td>Dashboard ringkasan inventaris.</td>
+</tr>
+<tr>
+<td>`login.php` / `logout.php`</td>
+<td>Autentikasi dan pengakhiran sesi.</td>
+</tr>
+<tr>
+<td>`daftar-inventaris.php`</td>
+<td>Daftar aset tetap dan detail unit.</td>
+</tr>
+<tr>
+<td>`daftar-bhp.php`</td>
+<td>Daftar stok barang habis pakai.</td>
+</tr>
+<tr>
+<td>`daftar-barang.php`</td>
+<td>Katalog/master jenis barang.</td>
+</tr>
+<tr>
+<td>`tambah-barang.php`</td>
+<td>Menambah master barang, master BHP, atau unit ke ruangan.</td>
+</tr>
+<tr>
+<td>`ruangan.php`</td>
+<td>Daftar ruangan dan detail inventaris per ruangan.</td>
+</tr>
+<tr>
+<td>`scan-barcode.php`</td>
+<td>Scan QR/barcode dan memperbarui data unit.</td>
+</tr>
+<tr>
+<td>`laporan.php`</td>
+<td>Filter, cetak, dan ekspor laporan inventaris.</td>
+</tr>
+<tr>
+<td>`manajemen-kategori.php`</td>
+<td>CRUD kategori aset tetap.</td>
+</tr>
+<tr>
+<td>`manajemen-ruangan.php`</td>
+<td>CRUD ruangan.</td>
+</tr>
+<tr>
+<td>`manajemen-user.php`</td>
+<td>CRUD pengguna dan reset password.</td>
+</tr>
+<tr>
+<td>`api-scan.php`</td>
+<td>Endpoint pencarian unit berdasarkan barcode.</td>
+</tr>
+<tr>
+<td>`api/export-inventaris.php`</td>
+<td>Endpoint ekspor inventaris.</td>
+</tr>
+<tr>
+<td>`api/get_kode_otomatis.php`</td>
+<td>Endpoint kode otomatis.</td>
+</tr>
+<tr>
+<td>`config/koneksi.php`</td>
+<td>Konfigurasi koneksi database.</td>
+</tr>
+<tr>
+<td>`includes/header.php`</td>
+<td>Kerangka header halaman.</td>
+</tr>
+<tr>
+<td>`includes/sidebar.php`</td>
+<td>Navigasi dan pembatasan menu berdasarkan role.</td>
+</tr>
+<tr>
+<td>`includes/footer.php`</td>
+<td>Footer halaman dan aset JavaScript.</td>
+</tr>
+<tr>
+<td>`assets/css/`</td>
+<td>Stylesheet aplikasi.</td>
+</tr>
+<tr>
+<td>`assets/js/`</td>
+<td>JavaScript antarmuka.</td>
+</tr>
+<tr>
+<td>`uploads/barang/`</td>
+<td>Penyimpanan gambar barang.</td>
+</tr>
+</tbody></table>
+<h2>3. Prasyarat dan Instalasi</h2>
+<h3>3.1 Prasyarat server</h3>
+<ul>
+<li>Windows dengan XAMPP atau stack Apache/PHP/MySQL setara.</li>
+<li>PHP dengan ekstensi `mysqli`, `fileinfo`, dan `ZipArchive`.</li>
+<li>MySQL/MariaDB.</li>
+<li>Browser modern dengan izin kamera jika fitur scan digunakan.</li>
+<li>Koneksi internet untuk library CDN pada halaman scan dan ikon tertentu.</li>
+</ul>
+<h3>3.2 Konfigurasi database</h3>
+<p>File konfigurasi berada di `config/koneksi.php` dengan nilai bawaan:</p>
+<p>```text</p>
+<p>Host     : localhost</p>
+<p>User     : root</p>
+<p>Password : kosong</p>
+<p>Database : sivenpras_tb</p>
+<pre>
+
+
+Buat database bernama `sivenpras_tb`, lalu impor skema dan data awal yang disediakan proyek. Pastikan tabel minimal berikut tersedia: `users`, `kategori`, `barang`, `inventaris`, `ruangan`, `kategori_bhp`, `bhp`, dan `inventaris_bhp`.
+
+
+
+### 3.3 Menjalankan aplikasi
+
+
+
+1. Simpan proyek pada `C:\xampp\htdocs\sivenpras_tb`.
+
+2. Jalankan Apache dan MySQL dari XAMPP Control Panel.
+
+3. Pastikan database `sivenpras_tb` telah dibuat dan dapat diakses.
+
+4. Buka `http://localhost/sivenpras_tb/login.php`.
+
+5. Masuk menggunakan akun yang tersedia pada tabel `users`.
+
+
+
+## 4. Autentikasi dan Role
+
+
+
+Semua halaman internal memulai sesi PHP dan mengarahkan pengguna yang belum login ke halaman login. Setelah berhasil login, sesi menyimpan `login`, `username`, `user_id`, dan `role`.
+
+
+
+### 4.1 Proses login
+
+
+
+1. Pengguna mengisi username dan password.
+
+2. Sistem mencari username pada tabel `users`.
+
+3. Password diverifikasi menggunakan bcrypt. Untuk kompatibilitas data lama, kode juga masih menerima password plaintext yang sama persis dengan nilai database.
+
+4. Sistem menyimpan sesi dan mengarahkan pengguna ke dashboard.
+
+5. Username tidak ditemukan, password salah, atau field kosong menghasilkan pesan kesalahan.
+
+
+
+### 4.2 Role dan hak akses
+
+
+
+| Role | Hak akses utama |
+
+|---|---|
+
+| `admin` | Seluruh menu, termasuk manajemen user, kategori, dan ruangan. |
+
+| `kepala_sekolah` | Melihat dashboard, inventaris, BHP, scan, ruangan, dan laporan; tidak dapat mengubah data melalui menu tambah/scan. |
+
+| `guru` / `staff` / `user` | Akses operasional sesuai konfigurasi menu dan halaman yang tersedia. |
+
+
+
+Catatan: nilai role yang digunakan perlu konsisten antara data database, sidebar, dan form manajemen user. Sidebar secara eksplisit memakai `admin` dan `kepala_sekolah`, sedangkan form user pada kode saat ini juga menampilkan `staff`.
+
+
+
+## 5. Dokumentasi Menu dan Fitur
+
+
+
+### 5.1 Dashboard
+
+
+
+Alamat: `index.php`
+
+
+
+Dashboard menampilkan:
+
+
+
+- Total unit inventaris.
+
+- Total jenis barang.
+
+- Jumlah unit dengan kondisi baik.
+
+- Jumlah unit rusak.
+
+- Jumlah unit hilang.
+
+- Persentase kondisi baik.
+
+- Lima kategori dengan jumlah unit terbanyak.
+
+- Distribusi kondisi barang.
+
+
+
+Data dashboard dihitung langsung dari tabel `inventaris`, `barang`, dan `kategori` setiap kali halaman dibuka.
+
+
+
+### 5.2 Daftar Inventaris Aset Tetap
+
+
+
+Alamat: `daftar-inventaris.php`
+
+
+
+Fitur:
+
+
+
+- Menampilkan jenis barang, kategori, jumlah unit, kondisi, dan lokasi.
+
+- Pencarian berdasarkan nama barang atau lokasi.
+
+- Filter berdasarkan kategori.
+
+- Membuka detail unit untuk melihat barcode, kondisi, keterangan, lokasi, dan gambar.
+
+- Upload, edit, dan hapus gambar barang dengan format JPG, JPEG, PNG, atau WEBP.
+
+- Menyediakan data ruangan yang dapat dipakai untuk ekspor.
+
+
+
+Role `kepala_sekolah` tidak diizinkan melakukan perubahan gambar.
+
+
+
+### 5.3 Daftar Barang / Katalog
+
+
+
+Alamat: `daftar-barang.php`
+
+
+
+Fitur admin/operasional:
+
+
+
+- Melihat semua jenis barang dan kategori.
+
+- Melihat jumlah unit inventaris per jenis barang.
+
+- Menambah barang dengan nama dan kategori.
+
+- Mengubah nama dan kategori barang.
+
+- Menghapus barang.
+
+
+
+Penghapusan barang menggunakan transaksi dan menghapus seluruh unit inventaris yang terkait terlebih dahulu. Tindakan ini bersifat destruktif dan harus dikonfirmasi.
+
+
+
+### 5.4 Tambah Barang
+
+
+
+Alamat: `tambah-barang.php`
+
+
+
+Halaman ini memiliki beberapa konteks kerja:
+
+
+
+#### Menambah master barang
+
+
+
+- Isi nama barang.
+
+- Pilih kategori.
+
+- Isi keterangan jika diperlukan.
+
+- Upload gambar opsional maksimal 2 MB.
+
+- Format gambar yang diterima: JPG, PNG, atau WEBP.
+
+
+
+#### Menambah master BHP
+
+
+
+- Isi barcode BHP.
+
+- Isi nama barang BHP.
+
+- Pilih kategori BHP.
+
+- Data awal stok adalah 0.
+
+
+
+#### Menambah unit barang ke ruangan
+
+
+
+- Pilih jenis barang.
+
+- Masukkan jumlah unit.
+
+- Masukkan tahun perolehan.
+
+- Masukkan keterangan.
+
+- Sistem membuat barcode otomatis untuk setiap unit.
+
+- Kondisi awal unit adalah `baik`.
+
+
+
+Format barcode unit mengikuti pola:
+
+
+
+```text
+
+KODE-BARANG-KODE-RUANGAN-NOMOR-URUT
+
+Contoh: MKGU-2-001
+
+</pre>
+<p>Jika nama barang terdiri dari beberapa kata, kode diambil dari konsonan awal kata. Jika katalog barang memiliki barcode produk, nilai tersebut dipakai sebagai dasar kode.</p>
+<p>#### Distribusi BHP ke ruangan</p>
+<ul>
+<li>Pilih BHP.</li>
+<li>Masukkan jumlah dan satuan.</li>
+<li>Tambahkan keterangan.</li>
+<li>Sistem memeriksa kecukupan stok.</li>
+<li>Jika berhasil, stok BHP berkurang dan catatan distribusi disimpan.</li>
+</ul>
+<h3>5.5 Barang Habis Pakai</h3>
+<p>Alamat: `daftar-bhp.php`</p>
+<p>Fitur:</p>
+<ul>
+<li>Pencarian berdasarkan nama atau kategori BHP.</li>
+<li>Melihat stok tersedia.</li>
+<li>Melihat satuan.</li>
+<li>Melihat jumlah terpakai per ruangan.</li>
+<li>Melihat keterangan BHP.</li>
+<li>Menambah stok melalui modal.</li>
+</ul>
+<p>Satuan yang didukung: PCS, Box, Pack, dan Lusin. Penambahan stok dicatat sebagai transaksi dan menambah nilai stok master BHP.</p>
+<h3>5.6 Ruangan</h3>
+<p>Alamat: `ruangan.php`</p>
+<p>#### Daftar ruangan</p>
+<p>Tanpa parameter `id`, halaman menampilkan seluruh ruangan sebagai kartu beserta jumlah barang. Pilih kartu ruangan untuk membuka detail.</p>
+<p>#### Detail ruangan</p>
+<p>Dengan parameter `id`, halaman menampilkan:</p>
+<ul>
+<li>Total barang dan jumlah berdasarkan kondisi.</li>
+<li>Daftar unit inventaris di ruangan.</li>
+<li>Daftar distribusi BHP di ruangan.</li>
+<li>Pencarian barcode, nama barang, atau kategori.</li>
+<li>Filter jenis barang dan kondisi.</li>
+<li>Perubahan kondisi unit.</li>
+<li>Perubahan keterangan unit.</li>
+<li>Penghapusan beberapa unit sekaligus.</li>
+<li>Tautan untuk menambah barang ke ruangan.</li>
+</ul>
+<p>Kondisi yang didukung: `baik`, `cukup baik`, `rusak`, `rusak parah`, dan `hilang`.</p>
+<p>Penghapusan massal hanya berlaku untuk unit yang berada pada ruangan aktif.</p>
+<h3>5.7 Scan Barcode dan QR Code</h3>
+<p>Alamat: `scan-barcode.php`</p>
+<p>Fitur:</p>
+<ul>
+<li>Scan menggunakan kamera perangkat.</li>
+<li>Mode QR Code dan Barcode.</li>
+<li>Pencarian kode secara manual.</li>
+<li>Menampilkan detail unit hasil scan.</li>
+<li>Mengubah keterangan dan kondisi unit.</li>
+<li>Mematikan kamera setelah selesai.</li>
+</ul>
+<p>Alur penggunaan:</p>
+<ol>
+<li>Pilih mode scan.</li>
+<li>Izinkan akses kamera pada browser atau masukkan kode secara manual.</li>
+<li>Sistem mengirim kode ke `api-scan.php`.</li>
+<li>Jika ditemukan, detail unit ditampilkan.</li>
+<li>Ubah kondisi atau keterangan lalu simpan.</li>
+</ol>
+<p>Role `kepala_sekolah` hanya dapat melihat hasil scan; field perubahan dibuat readonly dan tombol simpan disembunyikan.</p>
+<h3>5.8 Laporan Inventaris</h3>
+<p>Alamat: `laporan.php`</p>
+<p>Filter yang tersedia:</p>
+<ul>
+<li>Kategori.</li>
+<li>Nama barang, bergantung pada kategori yang dipilih.</li>
+<li>Kondisi.</li>
+<li>Lokasi/ruangan.</li>
+</ul>
+<p>Keluaran laporan:</p>
+<ul>
+<li>Tabel barcode, nama barang, kategori, lokasi, kondisi, tahun perolehan, dan keterangan.</li>
+<li>Cetak langsung melalui dialog print browser.</li>
+<li>Simpan sebagai PDF dari dialog print.</li>
+<li>Export Excel dengan format `.xlsx`.</li>
+</ul>
+<p>Export Excel mempertahankan filter yang sedang aktif dan menyertakan judul sekolah, tanggal cetak, header tabel, serta area tanda tangan.</p>
+<h3>5.9 Manajemen Kategori</h3>
+<p>Alamat: `manajemen-kategori.php`</p>
+<p>Fitur:</p>
+<ul>
+<li>Tambah kategori dan keterangan.</li>
+<li>Edit kategori dan keterangan.</li>
+<li>Hapus kategori.</li>
+<li>Melihat jumlah barang per kategori.</li>
+</ul>
+<p>Kategori yang masih digunakan oleh barang tidak dapat dihapus.</p>
+<h3>5.10 Manajemen Ruangan</h3>
+<p>Alamat: `manajemen-ruangan.php`</p>
+<p>Fitur:</p>
+<ul>
+<li>Tambah ruangan.</li>
+<li>Edit nama ruangan.</li>
+<li>Hapus ruangan.</li>
+<li>Melihat jumlah barang per ruangan.</li>
+</ul>
+<p>Penghapusan ruangan menghapus seluruh unit inventaris yang terkait melalui transaksi database. Pastikan data sudah dipindahkan atau dicadangkan sebelum menghapus.</p>
+<h3>5.11 Manajemen User</h3>
+<p>Alamat: `manajemen-user.php`</p>
+<p>Fitur:</p>
+<ul>
+<li>Melihat username, nama lengkap, email, role, dan status.</li>
+<li>Menambah user.</li>
+<li>Mengedit profil dan role.</li>
+<li>Reset password.</li>
+<li>Menghapus user.</li>
+</ul>
+<p>Password user baru dan password hasil reset disimpan menggunakan bcrypt. Username harus unik. User yang sedang login tidak dapat menghapus akunnya sendiri.</p>
+<h2>6. Model Data</h2>
+<p>Relasi utama yang tampak digunakan aplikasi:</p>
+<p>```text</p>
+<p>users</p>
+<p>kategori 1 --- banyak barang 1 --- banyak inventaris banyak --- 1 ruangan</p>
+<p>kategori_bhp 1 --- banyak bhp 1 --- banyak inventaris_bhp banyak --- 1 ruangan</p>
+<pre>
+
+
+Kolom penting yang digunakan:
+
+
+
+| Tabel | Kolom yang dipakai aplikasi |
+
+|---|---|
+
+| `users` | `id_user`, `username`, `password`, `nama_lengkap`, `email`, `role`, `created_at` |
+
+| `kategori` | `id_kategori`, `nama_kategori`, `keterangan` |
+
+| `barang` | `id_barang`, `nama_barang`, `kategori_id`, `deskripsi`, `gambar`, `barcode` |
+
+| `inventaris` | `id_inventaris`, `barang_id`, `ruangan_id`, `tahun_perolehan`, `kondisi`, `keterangan`, `barcode`, `update_at` |
+
+| `ruangan` | `id_ruangan`, `nama_ruangan` |
+
+| `kategori_bhp` | `id_kategori`, `nama_kategori` |
+
+| `bhp` | `id_bhp`, `nama_barang`, `kategori_id`, `deskripsi`, `barcode`, `stok` |
+
+| `inventaris_bhp` | `id_inventaris_bhp`, `bhp_id`, `ruangan_id`, `jumlah`, `satuan`, `keterangan`, `barcode` |
+
+
+
+## 7. Endpoint dan Integrasi
+
+
+
+### `api-scan.php`
+
+
+
+- Metode: POST.
+
+- Parameter: `barcode`.
+
+- Hasil sukses: JSON dengan status dan detail inventaris.
+
+- Hasil tidak ditemukan: status `not_found`.
+
+
+
+### `api/export-inventaris.php`
+
+
+
+Endpoint pendukung untuk ekspor data inventaris. Filter mengikuti parameter laporan jika dipanggil dari halaman laporan.
+
+
+
+### `api/get_kode_otomatis.php`
+
+
+
+Endpoint pendukung pembuatan atau pengambilan kode otomatis barang.
+
+
+
+## 8. Keamanan dan Validasi
+
+
+
+Implementasi saat ini mencakup:
+
+
+
+- Pemeriksaan sesi pada halaman internal.
+
+- Escape input menggunakan `mysqli_real_escape_string` pada banyak query.
+
+- Escape output HTML dengan `htmlspecialchars`.
+
+- Hash password bcrypt untuk user baru dan reset password.
+
+- Validasi ekstensi dan MIME file gambar.
+
+- Batas ukuran gambar 2 MB pada form tambah barang.
+
+- Transaksi dan rollback pada penghapusan barang/ruangan serta mutasi stok BHP.
+
+- Pencegahan penghapusan akun sendiri.
+
+- Pencegahan penghapusan kategori yang sedang digunakan.
+
+
+
+Rekomendasi penguatan sebelum produksi:
+
+
+
+- Hapus fallback password plaintext setelah seluruh akun lama dimigrasikan ke bcrypt.
+
+- Gunakan prepared statements untuk seluruh query, bukan hanya escape string.
+
+- Tambahkan token CSRF pada seluruh operasi POST/AJAX.
+
+- Validasi role di server pada setiap endpoint, bukan hanya menyembunyikan menu.
+
+- Batasi tipe, ukuran, dan nama file upload secara lebih ketat serta nonaktifkan eksekusi script pada folder upload.
+
+- Simpan kredensial database di environment variable atau konfigurasi di luar web root.
+
+- Tambahkan audit log untuk perubahan kondisi, penghapusan, mutasi stok, dan perubahan user.
+
+- Terapkan HTTPS jika kamera, login, atau aplikasi digunakan melalui jaringan.
+
+
+
+## 9. Prosedur Operasional yang Disarankan
+
+
+
+### Setup awal
+
+
+
+1. Buat kategori aset tetap.
+
+2. Buat kategori BHP.
+
+3. Buat ruangan.
+
+4. Buat akun pengguna dan tetapkan role.
+
+5. Tambahkan master barang dan master BHP.
+
+
+
+### Pencatatan aset tetap
+
+
+
+1. Buka Tambah Barang.
+
+2. Tambahkan master barang.
+
+3. Pilih ruangan.
+
+4. Tambahkan jumlah unit dan tahun perolehan.
+
+5. Cetak atau tempel barcode yang dihasilkan.
+
+6. Verifikasi data melalui detail ruangan atau Scan Barang.
+
+
+
+### Pemeliharaan data
+
+
+
+1. Lakukan pemeriksaan kondisi berkala.
+
+2. Perbarui kondisi melalui detail ruangan atau scan.
+
+3. Isi keterangan untuk kerusakan, pemindahan, atau kehilangan.
+
+4. Gunakan laporan dengan filter lokasi dan kondisi sebagai bahan pemeriksaan.
+
+
+
+### Pengelolaan BHP
+
+
+
+1. Buat master BHP beserta kategori dan barcode.
+
+2. Tambahkan stok masuk.
+
+3. Distribusikan BHP ke ruangan melalui halaman ruangan.
+
+4. Periksa saldo stok dan jumlah terpakai.
+
+
+
+## 10. Backup dan Pemulihan
+
+
+
+Backup minimal mencakup:
+
+
+
+- Database `sivenpras_tb`.
+
+- Folder `uploads/barang/`.
+
+- File konfigurasi dan source code.
+
+
+
+Contoh backup database menggunakan XAMPP:
+
+
+
+```text
+
+phpMyAdmin -&gt; pilih sivenpras_tb -&gt; Export -&gt; SQL -&gt; Go
+
+</pre>
+<p>Untuk pemulihan, buat database kosong, impor file SQL, kembalikan folder upload, lalu periksa koneksi pada `config/koneksi.php`.</p>
+<h2>11. Troubleshooting</h2>
+<table><thead><tr>
+<th>Masalah</th>
+<th>Pemeriksaan</th>
+</tr></thead><tbody>
+<tr>
+<td>Tidak dapat login</td>
+<td>Pastikan tabel `users`, username, password, dan role tersedia.</td>
+</tr>
+<tr>
+<td>Koneksi database gagal</td>
+<td>Periksa MySQL aktif, nama database, user, dan password.</td>
+</tr>
+<tr>
+<td>Kamera tidak aktif</td>
+<td>Gunakan HTTPS atau localhost, izinkan kamera, dan cek browser.</td>
+</tr>
+<tr>
+<td>Export Excel gagal</td>
+<td>Pastikan ekstensi PHP `ZipArchive` aktif.</td>
+</tr>
+<tr>
+<td>Gambar tidak tampil</td>
+<td>Periksa folder `uploads/barang/`, permission, dan nama file pada kolom `gambar`.</td>
+</tr>
+<tr>
+<td>BHP gagal digunakan</td>
+<td>Pastikan kolom `stok` dan `ruangan_id` sudah tersedia serta stok cukup.</td>
+</tr>
+<tr>
+<td>Menu tidak sesuai role</td>
+<td>Periksa nilai `$_SESSION[&#039;role&#039;]` dan nilai role pada tabel `users`.</td>
+</tr>
+<tr>
+<td>Data tidak tersimpan</td>
+<td>Periksa pesan error PHP/MySQL dan validasi field wajib.</td>
+</tr>
+</tbody></table>
+<h2>12. Daftar File Pemeriksaan Teknis</h2>
+<p>File utilitas pada proyek:</p>
+<ul>
+<li>`tools/test-env.php`: pemeriksaan lingkungan aplikasi.</li>
+<li>`tools/check-zip.php`: pemeriksaan dukungan ZIP/ZipArchive.</li>
+<li>`tests/test_data.csv`: data uji.</li>
+<li>`tests/test_xlsx_gen.py`: utilitas pengujian generator XLSX.</li>
+<li>`tools/generate_xlsx.py`: utilitas pembuatan XLSX.</li>
+</ul>
+<p>Dokumentasi ini disusun berdasarkan kode sumber yang tersedia pada proyek SIVENPRAS-TB dan sebaiknya diperbarui setiap kali struktur database, role, atau alur operasional berubah.</p>
+</body></html>

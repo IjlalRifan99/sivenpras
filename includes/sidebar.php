@@ -310,12 +310,19 @@ $user_role = strtolower($_SESSION['role'] ?? '');
             </div>
         </a>
 
-        <a href="laporan.php" class="menu-item <?= ($active_page ?? '') == 'laporan' ? 'active' : ''; ?>">
-            <div class="menu-left">
-                <i class="bi bi-file-earmark-text menu-icon"></i>
-                <span class="menu-text">Laporan</span>
+        <div class="inventory-menu-group" id="reportDropdown">
+            <a href="laporan.php" class="menu-item <?= in_array(($active_page ?? ''), ['laporan', 'laporan-bhp'], true) ? 'active' : ''; ?>" id="reportToggle">
+                <div class="menu-left">
+                    <i class="bi bi-file-earmark-text menu-icon"></i>
+                    <span class="menu-text">Laporan</span>
+                </div>
+                <i class="bi bi-chevron-down inventory-menu-chevron"></i>
+            </a>
+            <div class="inventory-submenu">
+                <a href="laporan.php" class="inventory-submenu-item <?= ($active_page ?? '') == 'laporan' ? 'active' : ''; ?>">Aset Tetap</a>
+                <a href="laporan-bhp.php" class="inventory-submenu-item <?= ($active_page ?? '') == 'laporan-bhp' ? 'active' : ''; ?>">Barang Habis Pakai</a>
             </div>
-        </a>
+        </div>
     </nav>
 
     <!-- Menu Admin -->
@@ -365,6 +372,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.getElementById('mainSidebar');
     const dropdown = document.getElementById('inventoryDropdown');
     const toggleBtn = document.getElementById('inventoryToggle');
+    const reportDropdown = document.getElementById('reportDropdown');
+    const reportToggle = document.getElementById('reportToggle');
     const submenuItems = document.querySelectorAll('.inventory-submenu-item');
 
     if (toggleBtn) {
@@ -385,15 +394,33 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    if (reportToggle) {
+        reportToggle.addEventListener('click', function(e) {
+            const isMobileCollapsed = window.innerWidth <= 640 && document.body.classList.contains('mobile-sidebar-collapsed');
+
+            if (isMobileCollapsed || (sidebar && sidebar.classList.contains('collapsed'))) {
+                return true;
+            }
+
+            e.preventDefault();
+            e.stopPropagation();
+            reportDropdown.classList.toggle('open');
+        });
+    }
+
     submenuItems.forEach(item => {
         item.addEventListener('click', function() {
             dropdown.classList.remove('open');
+            reportDropdown.classList.remove('open');
         });
     });
 
     document.addEventListener('click', function(event) {
         if (dropdown && !dropdown.contains(event.target)) {
             dropdown.classList.remove('open');
+        }
+        if (reportDropdown && !reportDropdown.contains(event.target)) {
+            reportDropdown.classList.remove('open');
         }
     });
 

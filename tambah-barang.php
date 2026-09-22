@@ -35,6 +35,13 @@ $pesan_sukses = "";
 $pesan_error = "";
 $id_ruangan = isset($_GET['id_ruangan']) ? (int) $_GET['id_ruangan'] : (isset($_POST['id_ruangan']) ? (int) $_POST['id_ruangan'] : 0);
 $current_year = date('Y');
+$current_date = date('Y-m-d');
+
+$tanggal_perolehan_column = mysqli_query($koneksi, "SHOW COLUMNS FROM inventaris LIKE 'tanggal_perolehan'");
+if (!$tanggal_perolehan_column || mysqli_num_rows($tanggal_perolehan_column) === 0) {
+    mysqli_query($koneksi, "ALTER TABLE inventaris ADD COLUMN tanggal_perolehan DATE NULL AFTER tahun_perolehan");
+    mysqli_query($koneksi, "UPDATE inventaris SET tanggal_perolehan = CONCAT(tahun_perolehan, '-01-01') WHERE tanggal_perolehan IS NULL AND tahun_perolehan IS NOT NULL");
+}
 
 $bhp_barcode_ready = false;
 $q_bhp_barcode_column = mysqli_query($koneksi, "SHOW COLUMNS FROM bhp LIKE 'barcode'");
@@ -51,6 +58,14 @@ if ($q_bhp_stok_column && mysqli_num_rows($q_bhp_stok_column) > 0) {
 } else {
     $bhp_stok_ready = (bool) mysqli_query($koneksi, "ALTER TABLE bhp ADD COLUMN stok INT NOT NULL DEFAULT 0");
 }
+$bhp_satuan_ready = false;
+$q_bhp_satuan_column = mysqli_query($koneksi, "SHOW COLUMNS FROM bhp LIKE 'satuan'");
+if ($q_bhp_satuan_column && mysqli_num_rows($q_bhp_satuan_column) > 0) {
+    $bhp_satuan_ready = true;
+} else {
+    $bhp_satuan_ready = (bool) mysqli_query($koneksi, "ALTER TABLE bhp ADD COLUMN satuan VARCHAR(20) NULL AFTER stok");
+    mysqli_query($koneksi, "UPDATE bhp h INNER JOIN (SELECT bhp_id, MAX(satuan) AS satuan FROM inventaris_bhp WHERE satuan IS NOT NULL AND satuan <> '' GROUP BY bhp_id) ib ON ib.bhp_id = h.id_bhp SET h.satuan = ib.satuan WHERE h.satuan IS NULL OR h.satuan = ''");
+}
 
 $bhp_ruangan_ready = false;
 $q_bhp_ruangan_column = mysqli_query($koneksi, "SHOW COLUMNS FROM inventaris_bhp LIKE 'ruangan_id'");
@@ -58,6 +73,14 @@ if ($q_bhp_ruangan_column && mysqli_num_rows($q_bhp_ruangan_column) > 0) {
     $bhp_ruangan_ready = true;
 } else {
     $bhp_ruangan_ready = (bool) mysqli_query($koneksi, "ALTER TABLE inventaris_bhp ADD COLUMN ruangan_id INT NULL AFTER bhp_id");
+}
+$bhp_tanggal_ready = false;
+$q_bhp_tanggal_column = mysqli_query($koneksi, "SHOW COLUMNS FROM inventaris_bhp LIKE 'tanggal_masuk'");
+if ($q_bhp_tanggal_column && mysqli_num_rows($q_bhp_tanggal_column) > 0) {
+    $bhp_tanggal_ready = true;
+} else {
+    $bhp_tanggal_ready = (bool) mysqli_query($koneksi, "ALTER TABLE inventaris_bhp ADD COLUMN tanggal_masuk DATE NULL AFTER jumlah");
+    mysqli_query($koneksi, "UPDATE inventaris_bhp SET tanggal_masuk = CURRENT_DATE WHERE tanggal_masuk IS NULL");
 }
 
 $q_ruangan_sidebar = mysqli_query($koneksi, "
@@ -75,7 +98,7 @@ if ($id_ruangan > 0) {
         exit;
     }
     $q_barang_katalog = mysqli_query($koneksi, "SELECT * FROM barang ORDER BY nama_barang ASC");
-    $q_bhp_katalog = mysqli_query($koneksi, "SELECT h.id_bhp, h.nama_barang, h.stok, k.nama_kategori FROM bhp h LEFT JOIN kategori_bhp k ON h.kategori_id = k.id_kategori ORDER BY h.nama_barang ASC");
+    $q_bhp_katalog = mysqli_query($koneksi, "SELECT h.id_bhp, h.nama_barang, h.stok, h.satuan, k.nama_kategori FROM bhp h LEFT JOIN kategori_bhp k ON h.kategori_id = k.id_kategori ORDER BY h.nama_barang ASC");
 } else {
     $q_kategori = mysqli_query($koneksi, "SELECT * FROM kategori ORDER BY nama_kategori ASC");
     $q_kategori_bhp = mysqli_query($koneksi, "SELECT * FROM kategori_bhp ORDER BY nama_kategori ASC");
@@ -85,27 +108,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if ($id_ruangan > 0 && ($_POST['jenis_tambah'] ?? '') === 'bhp') {
         $id_bhp = (int) ($_POST['id_bhp'] ?? 0);
         $jumlah_bhp = (int) ($_POST['jumlah_bhp'] ?? 0);
-        $satuan_bhp = strtoupper(trim($_POST['satuan_bhp'] ?? ''));
+        $tanggal_masuk_bhp = trim($_POST['tanggal_masuk_bhp'] ?? $current_date);
+        $tanggal_bhp_valid = DateTime::createFromFormat('Y-m-d', $tanggal_masuk_bhp);
         $keterangan_bhp_ruangan = mysqli_real_escape_string($koneksi, trim($_POST['keterangan_bhp_ruangan'] ?? ''));
-        $satuan_map_bhp = ['PCS' => 'PCS', 'BOX' => 'Box', 'PACK' => 'Pack', 'LUSIN' => 'Lusin'];
 
-        if ($id_bhp <= 0 || $jumlah_bhp <= 0 || !isset($satuan_map_bhp[$satuan_bhp])) {
-            $pesan_error = 'Pilih barang BHP, jumlah, dan satuan yang valid.';
-        } elseif (!$bhp_stok_ready || !$bhp_ruangan_ready) {
+        if ($id_bhp <= 0 || $jumlah_bhp <= 0 || !$tanggal_bhp_valid || $tanggal_bhp_valid->format('Y-m-d') !== $tanggal_masuk_bhp) {
+            $pesan_error = 'Pilih barang BHP, jumlah, dan tanggal masuk yang valid.';
+        } elseif (!$bhp_stok_ready || !$bhp_ruangan_ready || !$bhp_satuan_ready || !$bhp_tanggal_ready) {
             $pesan_error = 'Struktur data BHP belum siap. Jalankan migrasi database terlebih dahulu.';
         } else {
             mysqli_begin_transaction($koneksi);
-            $q_bhp = mysqli_query($koneksi, "SELECT stok FROM bhp WHERE id_bhp = '$id_bhp' LIMIT 1 FOR UPDATE");
+            $q_bhp = mysqli_query($koneksi, "SELECT stok, satuan FROM bhp WHERE id_bhp = '$id_bhp' LIMIT 1 FOR UPDATE");
             $d_bhp = $q_bhp ? mysqli_fetch_assoc($q_bhp) : null;
             $stok_tersedia = (int) ($d_bhp['stok'] ?? 0);
+            $satuan_bhp_db = mysqli_real_escape_string($koneksi, trim($d_bhp['satuan'] ?? ''));
 
             if (!$d_bhp) {
                 $pesan_error = 'Barang BHP tidak ditemukan.';
+            } elseif ($satuan_bhp_db === '') {
+                $pesan_error = 'Satuan BHP belum ditentukan pada master barang.';
             } elseif ($jumlah_bhp > $stok_tersedia) {
                 $pesan_error = "Stok tidak cukup. Stok tersedia: $stok_tersedia.";
             } else {
-                $satuan_bhp_db = mysqli_real_escape_string($koneksi, $satuan_map_bhp[$satuan_bhp]);
-                $insert_bhp_room = mysqli_query($koneksi, "INSERT INTO inventaris_bhp (bhp_id, ruangan_id, jumlah, satuan, keterangan, barcode) VALUES ('$id_bhp', '$id_ruangan', '$jumlah_bhp', '$satuan_bhp_db', '$keterangan_bhp_ruangan', '')");
+                $tanggal_bhp_db = mysqli_real_escape_string($koneksi, $tanggal_masuk_bhp);
+                $insert_bhp_room = mysqli_query($koneksi, "INSERT INTO inventaris_bhp (bhp_id, ruangan_id, jumlah, tanggal_masuk, satuan, keterangan, barcode) VALUES ('$id_bhp', '$id_ruangan', '$jumlah_bhp', '$tanggal_bhp_db', '$satuan_bhp_db', '$keterangan_bhp_ruangan', '')");
                 $update_stok = mysqli_query($koneksi, "UPDATE bhp SET stok = stok - '$jumlah_bhp' WHERE id_bhp = '$id_bhp' AND stok >= '$jumlah_bhp'");
                 if ($insert_bhp_room && $update_stok && mysqli_affected_rows($koneksi) > 0) {
                     mysqli_commit($koneksi);
@@ -120,11 +146,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $id_barang = isset($_POST['id_barang']) ? (int) $_POST['id_barang'] : 0;
         $jumlah = isset($_POST['jumlah']) ? (int) $_POST['jumlah'] : 0;
         $tahun_perolehan = isset($_POST['tahun_perolehan']) ? (int) $_POST['tahun_perolehan'] : $current_year;
+        $tanggal_perolehan = trim($_POST['tanggal_perolehan'] ?? $current_date);
+        $tanggal_valid = DateTime::createFromFormat('Y-m-d', $tanggal_perolehan);
         $keterangan = mysqli_real_escape_string($koneksi, $_POST['keterangan'] ?? '');
 
-        if ($id_barang === 0 || $jumlah <= 0) {
-            $pesan_error = "Harap pilih jenis barang dan masukkan jumlah unit yang valid.";
+        if ($id_barang === 0 || $jumlah <= 0 || !$tanggal_valid || $tanggal_valid->format('Y-m-d') !== $tanggal_perolehan) {
+            $pesan_error = "Harap pilih jenis barang, jumlah unit, dan tanggal perolehan yang valid.";
         } else {
+            $tahun_perolehan = (int) $tanggal_valid->format('Y');
             $q_barang = mysqli_query($koneksi, "SELECT * FROM barang WHERE id_barang = '$id_barang' LIMIT 1");
             if (!$q_barang || mysqli_num_rows($q_barang) == 0) {
                 $pesan_error = "Barang tidak ditemukan. Silakan pilih barang yang valid.";
@@ -154,7 +183,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 for ($i = 0; $i < $jumlah; $i++) {
                     $seq = $next_seq + $i;
                     $barcode = $kode_barang_singkat . '-' . $ruangan_code . '-' . str_pad($seq, 3, '0', STR_PAD_LEFT);
-                    $query_inv = "INSERT INTO inventaris (barang_id, ruangan_id, tahun_perolehan, kondisi, keterangan, barcode) VALUES ('$id_barang', '$id_ruangan', '$tahun_perolehan', 'baik', '$keterangan', '$barcode')";
+                    $tanggal_db = mysqli_real_escape_string($koneksi, $tanggal_perolehan);
+                    $query_inv = "INSERT INTO inventaris (barang_id, ruangan_id, tahun_perolehan, tanggal_perolehan, kondisi, keterangan, barcode) VALUES ('$id_barang', '$id_ruangan', '$tahun_perolehan', '$tanggal_db', 'baik', '$keterangan', '$barcode')";
 
                     if (mysqli_query($koneksi, $query_inv)) {
                         $saved++;
@@ -187,8 +217,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $pesan_error = 'Kolom barcode BHP belum tersedia.';
             } else {
                 $barcode_bhp_db = mysqli_real_escape_string($koneksi, $barcode_bhp);
-                $query_bhp = "INSERT INTO bhp (nama_barang, kategori_id, deskripsi, barcode, stok) VALUES ('$nama_bhp', '$id_kategori_bhp', '', '$barcode_bhp_db', 0)";
-                if (mysqli_query($koneksi, $query_bhp)) {
+                $satuan_bhp = strtoupper(trim($_POST['satuan_bhp'] ?? ''));
+                $satuan_map_bhp = ['PCS' => 'PCS', 'BOX' => 'Box', 'PACK' => 'Pack', 'LUSIN' => 'Lusin'];
+                if (!isset($satuan_map_bhp[$satuan_bhp])) {
+                    $pesan_error = 'Satuan BHP wajib dipilih.';
+                }
+                $satuan_bhp_db = mysqli_real_escape_string($koneksi, $satuan_map_bhp[$satuan_bhp] ?? '');
+                $query_bhp = "INSERT INTO bhp (nama_barang, kategori_id, deskripsi, barcode, stok, satuan) VALUES ('$nama_bhp', '$id_kategori_bhp', '', '$barcode_bhp_db', 0, '$satuan_bhp_db')";
+                if (empty($pesan_error) && mysqli_query($koneksi, $query_bhp)) {
                     $pesan_sukses = 'Master BHP berhasil ditambahkan.';
                     $nama_bhp = '';
                     $id_kategori_bhp = 0;
@@ -304,7 +340,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <select name="id_bhp" required>
                         <option value="">-- Pilih Barang BHP --</option>
                         <?php while ($hb = mysqli_fetch_assoc($q_bhp_katalog)) { ?>
-                            <option value="<?= $hb['id_bhp']; ?>"><?= htmlspecialchars($hb['nama_barang']); ?> (stok <?= (int) $hb['stok']; ?>)</option>
+                            <option value="<?= $hb['id_bhp']; ?>" data-satuan="<?= htmlspecialchars($hb['satuan'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"><?= htmlspecialchars($hb['nama_barang']); ?> (stok <?= (int) $hb['stok']; ?>)</option>
                         <?php } ?>
                     </select>
                 </div>
@@ -313,18 +349,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <input type="number" name="jumlah_bhp" value="1" min="1" required>
                 </div>
                 <div>
-                    <label>Satuan <span>*</span></label>
-                    <select name="satuan_bhp" required>
-                        <option value="">-- Pilih satuan --</option>
-                        <option value="PCS">PCS</option>
-                        <option value="BOX">Box</option>
-                        <option value="PACK">Pack</option>
-                        <option value="LUSIN">Lusin</option>
-                    </select>
+                    <label>Satuan</label>
+                    <input type="text" id="satuanBhpRuangan" readonly placeholder="Otomatis mengikuti master BHP">
                 </div>
                 <div>
                     <label>Keterangan</label>
                     <input type="text" name="keterangan_bhp_ruangan" placeholder="Opsional">
+                </div>
+                <div>
+                    <label>Tanggal Masuk</label>
+                    <input type="date" name="tanggal_masuk_bhp" value="<?= $current_date; ?>" required>
                 </div>
             </div>
             <div class="master-form-actions"><button type="submit" class="btn-primary">Simpan ke Ruangan</button></div>
@@ -396,6 +430,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <?php } ?>
                             </select>
                         </div>
+                        <div class="barcode-form-field">
+                            <label for="scannedSatuan">Satuan BHP <span>*</span></label>
+                            <select name="satuan_bhp" id="scannedSatuan" required>
+                                <option value="">-- Pilih satuan --</option>
+                                <option value="PCS">PCS</option>
+                                <option value="BOX">Box</option>
+                                <option value="PACK">Pack</option>
+                                <option value="LUSIN">Lusin</option>
+                            </select>
+                        </div>
                         <div class="barcode-modal-actions">
                             <button type="button" class="barcode-secondary-btn" id="rescanBarcode">Scan Ulang</button>
                             <button type="submit" class="btn-primary">Simpan Barang</button>
@@ -449,9 +493,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                 <div style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px;">
                     <div>
-                        <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">TAHUN
+                            <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">TANGGAL
                             PEROLEHAN</label>
-                        <input type="number" name="tahun_perolehan" value="<?= $current_year; ?>" min="2000" max="2099"
+                        <input type="date" name="tanggal_perolehan" value="<?= $current_date; ?>" required
                             style="width:100%;padding:10px 14px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;">
                     </div>
                 </div>
@@ -576,6 +620,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     const inputGambar = document.getElementById('gambar');
     const previewContainer = document.getElementById('preview-container');
     const previewGambar = document.getElementById('preview-gambar');
+    const bhpRoomSelect = document.querySelector('select[name="id_bhp"]');
+    const bhpRoomUnit = document.getElementById('satuanBhpRuangan');
+
+    if (bhpRoomSelect && bhpRoomUnit) {
+        bhpRoomSelect.addEventListener('change', function () {
+            const selected = this.options[this.selectedIndex];
+            bhpRoomUnit.value = selected ? (selected.dataset.satuan || 'Belum ditentukan') : '';
+        });
+    }
 
     if (inputGambar) {
         inputGambar.addEventListener('change', function () {

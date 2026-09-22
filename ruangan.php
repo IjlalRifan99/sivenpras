@@ -13,6 +13,11 @@ $q_bhp_ruangan_column = mysqli_query($koneksi, "SHOW COLUMNS FROM inventaris_bhp
 if (!$q_bhp_ruangan_column || mysqli_num_rows($q_bhp_ruangan_column) === 0) {
     mysqli_query($koneksi, "ALTER TABLE inventaris_bhp ADD COLUMN ruangan_id INT NULL AFTER bhp_id");
 }
+$q_bhp_tanggal_column = mysqli_query($koneksi, "SHOW COLUMNS FROM inventaris_bhp LIKE 'tanggal_masuk'");
+if (!$q_bhp_tanggal_column || mysqli_num_rows($q_bhp_tanggal_column) === 0) {
+    mysqli_query($koneksi, "ALTER TABLE inventaris_bhp ADD COLUMN tanggal_masuk DATE NULL AFTER jumlah");
+    mysqli_query($koneksi, "UPDATE inventaris_bhp SET tanggal_masuk = CURRENT_DATE WHERE tanggal_masuk IS NULL");
+}
 
 $active_page = 'ruangan';
 
@@ -168,6 +173,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['hapus_massal'], $_POS
     exit;
 }
 
+// Handler Edit BHP pada ruangan. Perubahan jumlah menyesuaikan stok master.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action_bhp'] ?? '') === 'edit') {
+    $id_inventaris_bhp = (int) ($_POST['id_inventaris_bhp'] ?? 0);
+    $jumlah_bhp_baru = (int) ($_POST['jumlah_bhp'] ?? 0);
+    $keterangan_bhp = mysqli_real_escape_string($koneksi, trim($_POST['keterangan_bhp'] ?? ''));
+
+    if ($user_role === 'kepala_sekolah') {
+        $bhp_message = 'Akses ditolak.';
+    } elseif ($id_inventaris_bhp <= 0 || $jumlah_bhp_baru <= 0) {
+        $bhp_message = 'Jumlah BHP harus lebih dari nol.';
+    } else {
+        mysqli_begin_transaction($koneksi);
+        $q_bhp_edit = mysqli_query($koneksi, "SELECT ib.jumlah, ib.bhp_id, h.stok FROM inventaris_bhp ib JOIN bhp h ON h.id_bhp = ib.bhp_id WHERE ib.id_inventaris_bhp = '$id_inventaris_bhp' AND ib.ruangan_id = '$id_ruangan' FOR UPDATE");
+        $bhp_edit = $q_bhp_edit ? mysqli_fetch_assoc($q_bhp_edit) : null;
+        if (!$bhp_edit) {
+            $bhp_message = 'Data BHP di ruangan tidak ditemukan.';
+        } else {
+            $selisih = $jumlah_bhp_baru - (int) $bhp_edit['jumlah'];
+            $stok_cukup = $selisih <= 0 || (int) $bhp_edit['stok'] >= $selisih;
+            if (!$stok_cukup) {
+                $bhp_message = 'Stok tidak cukup. Stok tersedia: ' . (int) $bhp_edit['stok'] . '.';
+            } else {
+                $update_room = mysqli_query($koneksi, "UPDATE inventaris_bhp SET jumlah = '$jumlah_bhp_baru', keterangan = '$keterangan_bhp' WHERE id_inventaris_bhp = '$id_inventaris_bhp' AND ruangan_id = '$id_ruangan'");
+                $update_stock = mysqli_query($koneksi, "UPDATE bhp SET stok = stok - ($selisih) WHERE id_bhp = '" . (int) $bhp_edit['bhp_id'] . "' AND stok >= ($selisih)");
+                if ($update_room && $update_stock) {
+                    mysqli_commit($koneksi);
+                    $bhp_message = 'Data BHP berhasil diperbarui.';
+                } else {
+                    mysqli_rollback($koneksi);
+                    $bhp_message = 'Data BHP gagal diperbarui.';
+                }
+            }
+        }
+        if (!empty($bhp_message) && !str_contains($bhp_message, 'berhasil')) {
+            mysqli_rollback($koneksi);
+        }
+    }
+    header('Location: ruangan.php?id=' . $id_ruangan . '&bhp_message=' . urlencode($bhp_message ?? ''));
+    exit;
+}
+
+// Handler Hapus BHP dari ruangan. Jumlah yang dihapus dikembalikan ke stok master.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action_bhp'] ?? '') === 'delete') {
+    $id_inventaris_bhp = (int) ($_POST['id_inventaris_bhp'] ?? 0);
+    if ($user_role === 'kepala_sekolah') {
+        $bhp_message = 'Akses ditolak.';
+    } else {
+        mysqli_begin_transaction($koneksi);
+        $q_bhp_delete = mysqli_query($koneksi, "SELECT jumlah, bhp_id FROM inventaris_bhp WHERE id_inventaris_bhp = '$id_inventaris_bhp' AND ruangan_id = '$id_ruangan' FOR UPDATE");
+        $bhp_delete = $q_bhp_delete ? mysqli_fetch_assoc($q_bhp_delete) : null;
+        $delete_room = $bhp_delete ? mysqli_query($koneksi, "DELETE FROM inventaris_bhp WHERE id_inventaris_bhp = '$id_inventaris_bhp' AND ruangan_id = '$id_ruangan'") : false;
+        $restore_stock = $delete_room ? mysqli_query($koneksi, "UPDATE bhp SET stok = stok + " . (int) $bhp_delete['jumlah'] . " WHERE id_bhp = '" . (int) $bhp_delete['bhp_id'] . "'") : false;
+        if ($bhp_delete && $delete_room && $restore_stock) {
+            mysqli_commit($koneksi);
+            $bhp_message = 'BHP berhasil dihapus dari ruangan dan stok dikembalikan.';
+        } else {
+            mysqli_rollback($koneksi);
+            $bhp_message = 'BHP gagal dihapus dari ruangan.';
+        }
+    }
+    header('Location: ruangan.php?id=' . $id_ruangan . '&bhp_message=' . urlencode($bhp_message ?? ''));
+    exit;
+}
+
 // 2. Ambil Informasi Ruangan Aktif
 $q_detail_ruangan = mysqli_query($koneksi, "SELECT * FROM ruangan WHERE id_ruangan = '$id_ruangan'");
 $d_ruangan = mysqli_fetch_assoc($q_detail_ruangan);
@@ -260,7 +329,7 @@ $sql_list .= " ORDER BY i.barcode ASC";
 $q_list = mysqli_query($koneksi, $sql_list);
 
 $sql_bhp_room = "
-    SELECT ib.id_inventaris_bhp, ib.jumlah, ib.satuan, ib.keterangan,
+    SELECT ib.id_inventaris_bhp, ib.jumlah, ib.satuan, ib.tanggal_masuk, ib.keterangan, ib.bhp_id,
            h.nama_barang, k.nama_kategori
     FROM inventaris_bhp ib
     JOIN bhp h ON ib.bhp_id = h.id_bhp
@@ -279,6 +348,12 @@ $q_bhp_room = mysqli_query($koneksi, $sql_bhp_room);
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
 <div class="dashboard-container" style="padding: 24px;">
+
+    <?php if (!empty($_GET['bhp_message'])): ?>
+        <div style="margin-bottom:16px;padding:12px 16px;border-radius:8px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;">
+            <?= htmlspecialchars($_GET['bhp_message']); ?>
+        </div>
+    <?php endif; ?>
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h1 style="font-size: 26px; color: #0f172a; font-weight: 700;">
@@ -503,7 +578,7 @@ $q_bhp_room = mysqli_query($koneksi, $sql_bhp_room);
                 </div>
                 <div class="room-bhp-table-wrap">
                     <table class="room-bhp-table">
-                        <thead><tr><th>No</th><th>Nama Barang</th><th>Kategori</th><th>Jumlah</th><th>Satuan</th><th>Keterangan</th></tr></thead>
+                        <thead><tr><th>No</th><th>Nama Barang</th><th>Kategori</th><th>Jumlah</th><th>Satuan</th><th>Tanggal Masuk</th><th>Keterangan</th><?php if ($user_role !== 'kepala_sekolah'): ?><th>Aksi</th><?php endif; ?></tr></thead>
                         <tbody>
                             <?php $no_bhp = 1; while ($bhp_room = mysqli_fetch_assoc($q_bhp_room)): ?>
                                 <tr>
@@ -512,7 +587,20 @@ $q_bhp_room = mysqli_query($koneksi, $sql_bhp_room);
                                     <td><?= htmlspecialchars($bhp_room['nama_kategori'] ?? '-'); ?></td>
                                     <td><span class="room-bhp-amount"><?= (int) $bhp_room['jumlah']; ?></span></td>
                                     <td><?= htmlspecialchars($bhp_room['satuan'] ?? '-'); ?></td>
+                                    <td><?= htmlspecialchars($bhp_room['tanggal_masuk'] ?? '-'); ?></td>
                                     <td><?= htmlspecialchars($bhp_room['keterangan'] ?: '-'); ?></td>
+                                    <?php if ($user_role !== 'kepala_sekolah'): ?>
+                                        <td class="room-bhp-actions">
+                                            <button type="button" class="btn-action btn-edit" onclick="openEditBhpRoomModal(<?= (int) $bhp_room['id_inventaris_bhp']; ?>, <?= (int) $bhp_room['jumlah']; ?>, <?= htmlspecialchars(json_encode($bhp_room['keterangan'] ?? '', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8'); ?>)">
+                                                <i class="bi bi-pencil-square"></i> Edit
+                                            </button>
+                                            <form method="POST" onsubmit="return confirm('Hapus BHP ini dari ruangan dan kembalikan stoknya?');">
+                                                <input type="hidden" name="action_bhp" value="delete">
+                                                <input type="hidden" name="id_inventaris_bhp" value="<?= (int) $bhp_room['id_inventaris_bhp']; ?>">
+                                                <button type="submit" class="btn-action btn-delete"><i class="bi bi-trash"></i> Hapus</button>
+                                            </form>
+                                        </td>
+                                    <?php endif; ?>
                                 </tr>
                             <?php endwhile; ?>
                         </tbody>
@@ -520,6 +608,26 @@ $q_bhp_room = mysqli_query($koneksi, $sql_bhp_room);
                 </div>
             </div>
         <?php endif; ?>
+        <div class="bhp-room-modal" id="editBhpRoomModal" aria-hidden="true">
+            <div class="bhp-room-modal-card" role="dialog" aria-modal="true" aria-labelledby="editBhpRoomTitle">
+                <div class="bhp-room-modal-header">
+                    <h2 id="editBhpRoomTitle">Edit BHP di Ruangan</h2>
+                    <button type="button" id="closeEditBhpRoom" aria-label="Tutup">&times;</button>
+                </div>
+                <form method="POST" class="bhp-room-modal-body">
+                    <input type="hidden" name="action_bhp" value="edit">
+                    <input type="hidden" name="id_inventaris_bhp" id="editBhpRoomId">
+                    <label>Jumlah <span>*</span></label>
+                    <input type="number" name="jumlah_bhp" id="editBhpRoomAmount" min="1" required>
+                    <label>Keterangan</label>
+                    <input type="text" name="keterangan_bhp" id="editBhpRoomNote">
+                    <div class="bhp-room-modal-actions">
+                        <button type="button" id="cancelEditBhpRoom">Batal</button>
+                        <button type="submit" class="btn-primary">Simpan Perubahan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
         <button id="btnScrollTop" class="btn-scroll-top" title="Kembali ke atas"><i class="bi bi-arrow-up"></i></button>
     </div>
 
@@ -537,6 +645,23 @@ $q_bhp_room = mysqli_query($koneksi, $sql_bhp_room);
     .room-bhp-table { width:100%; min-width:600px; border-collapse:collapse; }
     .room-bhp-table th, .room-bhp-table td { padding:12px 14px; border-bottom:1px solid #e2e8f0; text-align:left; font-size:14px; }
     .room-bhp-table th { background:#f8fafc; color:#64748b; font-size:12px; text-transform:uppercase; }
+    .room-bhp-actions { display:flex; align-items:center; gap:8px; white-space:nowrap; }
+    .room-bhp-actions form { margin:0; }
+    .room-bhp-actions .btn-action { padding:8px 10px; border:0; border-radius:6px; cursor:pointer; font:inherit; font-size:12px; font-weight:600; }
+    .room-bhp-actions .btn-edit { background:#dbeafe; color:#1d4ed8; }
+    .room-bhp-actions .btn-delete { background:#fee2e2; color:#b91c1c; }
+    .bhp-room-modal { display:none; position:fixed; inset:0; z-index:100000; align-items:center; justify-content:center; padding:18px; background:rgba(15,23,42,.6); }
+    .bhp-room-modal.show { display:flex; }
+    .bhp-room-modal-card { width:min(100%, 460px); background:#fff; border-radius:12px; box-shadow:0 24px 60px rgba(15,23,42,.25); }
+    .bhp-room-modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 20px; border-bottom:1px solid #e2e8f0; }
+    .bhp-room-modal-header h2 { margin:0; color:#0f172a; font-size:18px; }
+    .bhp-room-modal-header button { border:0; background:transparent; color:#64748b; cursor:pointer; font-size:28px; line-height:1; }
+    .bhp-room-modal-body { display:flex; flex-direction:column; gap:8px; padding:20px; }
+    .bhp-room-modal-body label { margin-top:5px; color:#475569; font-size:12px; font-weight:700; }
+    .bhp-room-modal-body label span { color:#dc2626; }
+    .bhp-room-modal-body input { box-sizing:border-box; width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font:inherit; }
+    .bhp-room-modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:14px; }
+    .bhp-room-modal-actions button:first-child { padding:10px 18px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#475569; cursor:pointer; font-weight:600; }
     .room-bhp-amount { display:inline-flex; min-width:34px; justify-content:center; padding:5px 9px; border-radius:6px; background:#fef3c7; color:#92400e; font-weight:700; }
 
     .btn-scroll-top {
@@ -564,6 +689,32 @@ $q_bhp_room = mysqli_query($koneksi, $sql_bhp_room);
 </style>
 
 <script>
+    const editBhpRoomModal = document.getElementById('editBhpRoomModal');
+    const editBhpRoomId = document.getElementById('editBhpRoomId');
+    const editBhpRoomAmount = document.getElementById('editBhpRoomAmount');
+    const editBhpRoomNote = document.getElementById('editBhpRoomNote');
+
+    function openEditBhpRoomModal(id, amount, note) {
+        editBhpRoomId.value = id;
+        editBhpRoomAmount.value = amount;
+        editBhpRoomNote.value = note;
+        editBhpRoomModal.classList.add('show');
+        editBhpRoomModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeEditBhpRoomModal() {
+        editBhpRoomModal.classList.remove('show');
+        editBhpRoomModal.setAttribute('aria-hidden', 'true');
+    }
+
+    if (editBhpRoomModal) {
+        document.getElementById('closeEditBhpRoom').addEventListener('click', closeEditBhpRoomModal);
+        document.getElementById('cancelEditBhpRoom').addEventListener('click', closeEditBhpRoomModal);
+        editBhpRoomModal.addEventListener('click', function (event) {
+            if (event.target === editBhpRoomModal) closeEditBhpRoomModal();
+        });
+    }
+
     // 1. Toggle Dropdown Sidebar Ruangan
     function toggleRuanganDropdown() {
         var dropdown = document.getElementById('ruanganDropdown');
